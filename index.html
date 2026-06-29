@@ -440,6 +440,7 @@ tr.row-het-bad td{background:rgba(240,97,109,.05)}
             <span id="calcPlatName">Shopee Mall</span>
           </span>
           <div class="panel-actions">
+            <button class="tbtn undo-btn" onclick="doUndo()" disabled title="Undo (Ctrl+Z)">↩ Undo</button>
             <button class="tbtn" onclick="addSku()">+ SKU</button>
             <button class="tbtn" onclick="openCalcUpload()">↑ Upload Massal</button>
             <button class="tbtn clear" id="clearFilters" style="display:none" onclick="clearAllFilters()">Reset filter</button>
@@ -542,6 +543,7 @@ tr.row-het-bad td{background:rgba(240,97,109,.05)}
         <div class="panel-head">
           <span class="panel-title">Semua SKU — Target &amp; Realisasi</span>
           <div class="panel-actions">
+            <button class="tbtn undo-btn" onclick="doUndo()" disabled title="Undo (Ctrl+Z)">↩ Undo</button>
             <input class="fmenu-search" style="width:180px;margin:0" placeholder="Cari SKU / kategori…" oninput="proySearchFn(this.value)">
             <button class="tbtn clear" id="proyClear" style="display:none" onclick="clearProyFilter()">Reset</button>
           </div>
@@ -631,6 +633,7 @@ tr.row-het-bad td{background:rgba(240,97,109,.05)}
         <div class="panel-head">
           <span class="panel-title">📊 Audit Listing Iklan</span>
           <div class="panel-actions">
+            <button class="tbtn undo-btn" onclick="doUndo()" disabled title="Undo (Ctrl+Z)">↩ Undo</button>
             <input class="fmenu-search" style="width:180px;margin:0" placeholder="Cari listing…" oninput="adsSearchFn(this.value)">
           </div>
         </div>
@@ -1531,7 +1534,65 @@ const fmt=n=>n>=1e6?'Rp'+(Math.round(n/1e5)/10)+'jt':n>=1e3?'Rp'+Math.round(n/1e
 const fmtFull=n=>'Rp'+Math.round(n).toLocaleString('id-ID');
 const pct=n=>(Math.round(n*1000)/10).toFixed(1).replace('.',',')+'%';
 const tipeC=t=>t==='HERO'?'t-hero':t==='REPEAT'?'t-repeat':t==='NEW'?'t-new':'t-trafic';
+// ── UNDO (Ctrl+Z) ──
+let undoStack=[]; const UNDO_MAX=50;
+function snapshot(label){
+  undoStack.push({label, sku:JSON.stringify(SKUS), proy:JSON.stringify(PROY), ads:JSON.stringify(ADS), map:JSON.stringify(LISTING_MAP)});
+  if(undoStack.length>UNDO_MAX)undoStack.shift();
+  updateUndoBtn();
+}
+function updateUndoBtn(){
+  document.querySelectorAll('.undo-btn').forEach(b=>{
+    b.disabled=undoStack.length===0;
+    b.style.opacity=undoStack.length===0?'0.4':'';
+    b.title=undoStack.length?('Undo: '+undoStack[undoStack.length-1].label+' (Ctrl+Z)'):'Tidak ada yang bisa di-undo';
+  });
+}
+function doUndo(){
+  if(!undoStack.length){dbStatus('Tidak ada yang bisa di-undo','err');return;}
+  const s=undoStack.pop();
+  // pulihkan state
+  const sku=JSON.parse(s.sku); SKUS.length=0; sku.forEach(x=>SKUS.push(x));
+  const proy=JSON.parse(s.proy); Object.keys(PROY).forEach(k=>delete PROY[k]); Object.assign(PROY,proy);
+  const ads=JSON.parse(s.ads); ADS.length=0; ads.forEach(x=>ADS.push(x));
+  const map=JSON.parse(s.map); Object.keys(LISTING_MAP).forEach(k=>delete LISTING_MAP[k]); Object.assign(LISTING_MAP,map);
+  renderKalkulator();renderProyeksi();renderAudit();renderDashboard();renderBase();renderAdsAudit();
+  updateUndoBtn();
+  dbStatus('↩ Dibatalkan: '+s.label,'save');
+  // simpan perubahan hasil undo ke DB (best-effort)
+  if(supa&&dbReady){(async()=>{
+    try{
+      const rows=SKUS.map(x=>({sku:x.sku,kategori:x.kat,tipe:x.tipe,hpp:x.hpp,berat:x.berat,zona:x.zone,plat:x.plat}));
+      for(let i=0;i<rows.length;i+=500)await supa.from('skus').upsert(rows.slice(i,i+500));
+      const pr=[];Object.entries(PROY).forEach(([m,sk])=>Object.entries(sk).forEach(([k,d])=>pr.push({month:m,sku:k,target:d.target||0,weeks:d.weeks||[]})));
+      if(pr.length)await supa.from('proyeksi').upsert(pr,{onConflict:'month,sku'});
+    }catch(e){}
+  })();}
+}
+document.addEventListener('keydown',e=>{
+  if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='z'&&!e.shiftKey){
+    const tag=(e.target.tagName||'').toLowerCase();
+    // kalau sedang mengetik di input, biarkan undo bawaan input dulu sekali; selain itu undo app
+    if(tag==='input'||tag==='textarea'||tag==='select'){return;}
+    e.preventDefault(); doUndo();
+  }
+});
+
 const statusOf=net=>net>0.0001?'pos':net<-0.0001?'neg':'warn';
+// status warna untuk SEMUA kolom numerik (untuk filter warna seragam)
+function colStatus(col,d,c){
+  switch(col.key){
+    case 'gm': return c.gm>0.05?'pos':c.gm>0?'warn':'neg';
+    case 'net': return statusOf(c.net);
+    case 'netNoAds': return statusOf(c.netNoAds);
+    case 'het': { const het=d.p.het, harga=d.p.harga; if(het>=harga&&harga>0)return 'neg'; return het>0?'pos':'warn'; }
+    default: {
+      const v=col.get(d);
+      if(typeof v!=='number')return 'warn';
+      return v>0?'pos':(v<0?'neg':'warn');
+    }
+  }
+}
 
 // ═══════════════════════ FILTER / SORT STATE ═══════════════════════
 let sortState={col:null,dir:null};   // dir: 'asc'|'desc'
@@ -1545,23 +1606,23 @@ function calcColumns(){
     {key:'sku', label:'SKU', type:'text', get:d=>d.sku},
     {key:'kat', label:'Kategori', type:'text', get:d=>d.kat},
     {key:'tipe', label:'Tipe', type:'text', get:d=>d.tipe},
-    {key:'hpp', label:'HPP', type:'num', get:d=>d.hpp},
-    {key:'harga', label:'Harga Jual', type:'num', get:d=>d.p.harga},
-    {key:'minbeli', label:'Min', type:'num', get:d=>d.p.minbeli},
+    {key:'hpp', label:'HPP', type:'num', status:true, get:d=>d.hpp},
+    {key:'harga', label:'Harga Jual', type:'num', status:true, get:d=>d.p.harga},
+    {key:'minbeli', label:'Min', type:'num', status:true, get:d=>d.p.minbeli},
   ];
   if(tt){
-    cols.push({key:'berat', label:'Berat (g)', type:'num', get:d=>d.berat});
+    cols.push({key:'berat', label:'Berat (g)', type:'num', status:true, get:d=>d.berat});
     cols.push({key:'tier', label:'Tier', type:'text', get:d=>beratToTier(d.berat)});
     cols.push({key:'zone', label:'Zona', type:'text', get:d=>d.zone});
-    cols.push({key:'logistik', label:'Logistik', type:'num', get:d=>getLogistik(d.zone,beratToTier(d.berat))});
+    cols.push({key:'logistik', label:'Logistik', type:'num', status:true, get:d=>getLogistik(d.zone,beratToTier(d.berat))});
   }
   cols.push({key:'gm', label:'GM %', type:'num', status:true, get:d=>calc({...d,...d.p},currentPlat).gm});
-  cols.push({key:'tprofit', label:'T.Profit', type:'num', get:d=>d.p.tprofit});
-  cols.push({key:'afil', label:'Affiliate', type:'num', get:d=>d.p.afil});
-  cols.push({key:'ads', label:'Ads', type:'num', get:d=>d.p.ads});
+  cols.push({key:'tprofit', label:'T.Profit', type:'num', status:true, get:d=>d.p.tprofit});
+  cols.push({key:'afil', label:'Affiliate', type:'num', status:true, get:d=>d.p.afil});
+  cols.push({key:'ads', label:'Ads', type:'num', status:true, get:d=>d.p.ads});
   cols.push({key:'net', label:'Net Bersih', type:'num', status:true, get:d=>calc({...d,...d.p},currentPlat).net});
   cols.push({key:'netNoAds', label:'Net Tanpa Iklan', type:'num', status:true, get:d=>calc({...d,...d.p},currentPlat).netNoAds});
-  cols.push({key:'het', label:'HET', type:'num', get:d=>d.p.het});
+  cols.push({key:'het', label:'HET', type:'num', status:true, get:d=>d.p.het});
   return cols;
 }
 
@@ -1587,10 +1648,7 @@ function getRows(){
     rows=rows.filter(d=>{
       if(f.status&&f.status.size){
         const c=calc({...d,...d.p},currentPlat);
-        const st=statusOf(col.key==='gm'?(c.gm>0.05?0.1:c.gm>0?0.02:-0.1):c.net);
-        // for gm use its own bucket
-        let stt=st;
-        if(col.key==='gm'){stt=c.gm>0.05?'pos':c.gm>0?'warn':'neg';}
+        const stt=colStatus(col,d,c);
         if(!f.status.has(stt))return false;
       }
       if(f.text){
@@ -1726,13 +1784,14 @@ function goPage(p){curPage=p;renderKalkulator();document.querySelector('.tbl-scr
 function delSku(i){
   const s=SKUS[i]; if(!s)return;
   if(confirm(`Hapus SKU "${s.sku}"?\nTindakan ini menghapus dari semua platform.`)){
+    snapshot('hapus '+s.sku);
     deleteSkuDB(s.sku);
     SKUS.splice(i,1);
     renderKalkulator();renderProyeksi();renderAudit();renderDashboard();renderBase();
   }
 }
-function upd(i,f,v){SKUS[i].plat[currentPlat][f]=parseFloat(v)||0;renderKalkulator();saveSku(SKUS[i].sku);}
-function updBase(i,f,v){SKUS[i][f]=(f==='zone')?v:(parseFloat(v)||0);renderKalkulator();}
+function upd(i,f,v){snapshot('ubah '+f+' '+SKUS[i].sku);SKUS[i].plat[currentPlat][f]=parseFloat(v)||0;renderKalkulator();saveSku(SKUS[i].sku);}
+function updBase(i,f,v){snapshot('ubah '+f+' '+SKUS[i].sku);SKUS[i][f]=(f==='zone')?v:(parseFloat(v)||0);renderKalkulator();saveSku(SKUS[i].sku);}
 function addSku(){
   SKUS.push({sku:'SKU-BARU', kat:'BAG', tipe:'NEW', hpp:0, berat:100, zone:'Jawa ( selain jakarta )',
     plat:{shopee_mall:{harga:0,minbeli:1,tprofit:10,afil:0,ads:0,het:0},shopee_star:{harga:0,minbeli:1,tprofit:10,afil:0,ads:0,het:0},
@@ -2128,8 +2187,8 @@ function renderTrend(){
     </div>`;
 }
 
-function updTarget(sku,v){getProy(sku).target=parseInt(v)||0;renderProyeksi();saveProy(proyMonth,sku);}
-function updWeek(sku,w,v){const d=getProy(sku);if(!d.weeks)d.weeks=[];d.weeks[w]=parseInt(v)||0;renderProyeksi();saveProy(proyMonth,sku);}
+function updTarget(sku,v){snapshot('ubah target '+sku);getProy(sku).target=parseInt(v)||0;renderProyeksi();saveProy(proyMonth,sku);}
+function updWeek(sku,w,v){snapshot('ubah W'+(w+1)+' '+sku);const d=getProy(sku);if(!d.weeks)d.weeks=[];d.weeks[w]=parseInt(v)||0;renderProyeksi();saveProy(proyMonth,sku);}
 
 // ── search filter for main proy table ──
 function clearProyFilter(){proySearch='';proyPage=1;document.getElementById('proyClear').style.display='none';renderProyTable();}
@@ -2514,6 +2573,7 @@ function closeSkuDrop(key){const d=document.getElementById('skudrop-'+key);if(d)
 function saveMapping(key){
   const set=adsMapDraft[key];
   if(!set||!set.size){alert('Pilih minimal 1 SKU dulu.');return;}
+  snapshot('mapping listing');
   LISTING_MAP[key]=[...set];
   delete adsMapDraft[key];
   saveListingMap(key);
@@ -2814,6 +2874,7 @@ function canEditModule(mod){return !!perm()[mod];}
 // Terapkan pembatasan ke UI (dipanggil tiap render)
 function applyPerms(){
   const p=perm();
+  if(typeof updateUndoBtn==='function')updateUndoBtn();
   // tampilkan menu admin (Kelola User) hanya untuk admin
   document.querySelectorAll('.nav-admin').forEach(el=>el.style.display=currentRole==='admin'?'':'none');
   // Kalkulator: enable/disable input per kolom
