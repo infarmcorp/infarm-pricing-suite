@@ -2645,7 +2645,7 @@ async function loadFromDB(){
     dbReady=true;
     dbStatus('✓ Data tersambung','ok');
     return true;
-  }catch(e){console.error('Load DB error:',e);dbStatus('⚠️ Gagal memuat data','err');return false;}
+  }catch(e){console.error('Load DB error:',e);dbStatus('⚠️ '+(e.message||'Gagal memuat data'),'err');return false;}
 }
 
 // ── SEED awal: kalau DB kosong, isi dari sample data ──
@@ -2705,20 +2705,32 @@ async function saveAllAds(){
 }
 
 // ── INIT ──
+function waitForSupabase(maxWait=8000){
+  return new Promise(resolve=>{
+    const t0=Date.now();
+    (function check(){
+      if(window.supabase&&window.supabase.createClient)return resolve(true);
+      if(Date.now()-t0>maxWait)return resolve(false);
+      setTimeout(check,150);
+    })();
+  });
+}
 async function startApp(){
   // render dulu pakai sample (biar app cepat muncul)
   renderKalkulator();renderProyeksi();renderAudit();renderDashboard();renderBase();renderAdsAudit();
-  // sambungkan DB
-  if(initSupa()){
+  // tunggu library Supabase ter-load
+  const libOK=await waitForSupabase();
+  if(libOK&&initSupa()){
     await seedDBIfEmpty();
     await loadFromDB();
-    // render ulang dengan data DB
     renderKalkulator();renderProyeksi();renderAudit();renderDashboard();renderBase();renderAdsAudit();
   }else{
     dbStatus('⚠️ Mode offline (data sementara)','err');
   }
 }
-startApp();
+// jalankan setelah halaman & script selesai load
+if(document.readyState==='complete')startApp();
+else window.addEventListener('load',startApp);
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
