@@ -1646,11 +1646,12 @@ function goPage(p){curPage=p;renderKalkulator();document.querySelector('.tbl-scr
 function delSku(i){
   const s=SKUS[i]; if(!s)return;
   if(confirm(`Hapus SKU "${s.sku}"?\nTindakan ini menghapus dari semua platform.`)){
+    deleteSkuDB(s.sku);
     SKUS.splice(i,1);
     renderKalkulator();renderProyeksi();renderAudit();renderDashboard();renderBase();
   }
 }
-function upd(i,f,v){SKUS[i].plat[currentPlat][f]=parseFloat(v)||0;renderKalkulator();}
+function upd(i,f,v){SKUS[i].plat[currentPlat][f]=parseFloat(v)||0;renderKalkulator();saveSku(SKUS[i].sku);}
 function updBase(i,f,v){SKUS[i][f]=(f==='zone')?v:(parseFloat(v)||0);renderKalkulator();}
 function addSku(){
   SKUS.push({sku:'SKU-BARU', kat:'BAG', tipe:'NEW', hpp:0, berat:100, zone:'Jawa ( selain jakarta )',
@@ -1751,6 +1752,12 @@ function applyCalcUpload(rows,plat){
   alert(`Upload ${PLATFORMS[plat].name} selesai.\nDiupdate: ${updated} SKU\nDitambah: ${added} SKU baru`);
   closeCalcUpload();
   curPage=1; renderKalkulator(); renderBase();
+  // simpan semua perubahan ke DB
+  if(supa&&dbReady){(async()=>{
+    const rows=SKUS.map(s=>({sku:s.sku,kategori:s.kat,tipe:s.tipe,hpp:s.hpp,berat:s.berat,zona:s.zone,plat:s.plat}));
+    for(let i=0;i<rows.length;i+=500){await supa.from('skus').upsert(rows.slice(i,i+500));}
+    dbStatus('✓ Semua SKU tersimpan','save');
+  })();}
 }
 
 // ── sort/filter interactions ──
@@ -2040,8 +2047,8 @@ function renderTrend(){
     </div>`;
 }
 
-function updTarget(sku,v){getProy(sku).target=parseInt(v)||0;renderProyeksi();}
-function updWeek(sku,w,v){const d=getProy(sku);if(!d.weeks)d.weeks=[];d.weeks[w]=parseInt(v)||0;renderProyeksi();}
+function updTarget(sku,v){getProy(sku).target=parseInt(v)||0;renderProyeksi();saveProy(proyMonth,sku);}
+function updWeek(sku,w,v){const d=getProy(sku);if(!d.weeks)d.weeks=[];d.weeks[w]=parseInt(v)||0;renderProyeksi();saveProy(proyMonth,sku);}
 
 // ── search filter for main proy table ──
 function clearProyFilter(){proySearch='';proyPage=1;document.getElementById('proyClear').style.display='none';renderProyTable();}
@@ -2122,6 +2129,12 @@ function applyUpload(rows,kind,mode){
   alert(`Upload ${kind} selesai (${mode}).\nDiterapkan: ${applied} SKU${unknown?`\nDilewati (SKU tak dikenal): ${unknown}`:''}`);
   closeUploadGuide();
   renderProyeksi();
+  // simpan ke DB
+  if(supa&&dbReady){(async()=>{
+    const rows=[];Object.entries(PROY[proyMonth]||{}).forEach(([sku,d])=>rows.push({month:proyMonth,sku,target:d.target||0,weeks:d.weeks||[]}));
+    if(rows.length)await supa.from('proyeksi').upsert(rows,{onConflict:'month,sku'});
+    dbStatus('✓ Proyeksi tersimpan','save');
+  })();}
 }
 
 // ═══════════════════════ AUDIT ═══════════════════════
@@ -2421,6 +2434,7 @@ function saveMapping(key){
   if(!set||!set.size){alert('Pilih minimal 1 SKU dulu.');return;}
   LISTING_MAP[key]=[...set];
   delete adsMapDraft[key];
+  saveListingMap(key);
   renderAdsAudit();
 }
 
@@ -2548,6 +2562,12 @@ function applyAdsUpload(wb,plat){
   if(warnings.length)msg+=`\n\n⚠️ ${warnings.length} peringatan:\n- `+warnings.slice(0,6).join('\n- ')+(warnings.length>6?`\n…dan ${warnings.length-6} lagi`:'');
   alert(msg);
   closeAdsUpload();renderAdsAudit();
+  // simpan ads & mapping ke DB
+  if(supa&&dbReady){(async()=>{
+    await saveAllAds();
+    const mapRows=Object.entries(LISTING_MAP).map(([k,skus])=>({listing_key:k,listing_name:k,skus}));
+    if(mapRows.length)await supa.from('listing_map').upsert(mapRows);
+  })();}
 }
 
 // ═══════════════════════ NAV ═══════════════════════
@@ -2569,9 +2589,138 @@ function nav(p){
   if(p==='adsaudit')renderAdsAudit();
 }
 
-// init
-renderKalkulator();renderProyeksi();renderAudit();renderDashboard();renderBase();renderAdsAudit();
+// ═══════════════════════ SUPABASE — DATABASE PERMANEN ═══════════════════════
+const SUPA_URL='https://uabchubwyhnmbqkqommg.supabase.co';
+const SUPA_KEY='sb_publishable_1rGKsQGldXrPokzQswV8rw_4ubbXAPm';
+let supa=null, dbReady=false, dbBusy=false;
+
+function initSupa(){
+  try{
+    if(window.supabase&&window.supabase.createClient){
+      supa=window.supabase.createClient(SUPA_URL,SUPA_KEY);
+      return true;
+    }
+  }catch(e){console.warn('Supabase init gagal:',e);}
+  return false;
+}
+
+function dbStatus(msg,type){
+  let el=document.getElementById('dbStatus');
+  if(!el){
+    el=document.createElement('div');el.id='dbStatus';
+    el.style.cssText='position:fixed;bottom:16px;right:16px;z-index:9999;padding:9px 14px;border-radius:9px;font-size:11.5px;font-weight:600;font-family:Inter,sans-serif;backdrop-filter:blur(10px);transition:.3s;box-shadow:0 6px 20px rgba(0,0,0,.4)';
+    document.body.appendChild(el);
+  }
+  const colors={ok:'background:rgba(63,185,132,.15);color:#5FD3A0;border:1px solid #3FB984',
+    save:'background:rgba(77,163,255,.15);color:#4DA3FF;border:1px solid #4DA3FF',
+    err:'background:rgba(245,136,146,.15);color:#F58892;border:1px solid #F58892'};
+  el.style.cssText+=';'+(colors[type]||colors.ok);
+  el.textContent=msg;el.style.opacity='1';
+  if(type==='ok'||type==='save'){clearTimeout(el._t);el._t=setTimeout(()=>{el.style.opacity='0';},2200);}
+}
+
+// ── LOAD semua data dari database ──
+async function loadFromDB(){
+  if(!supa)return false;
+  try{
+    dbStatus('⏳ Memuat data…','save');
+    // SKUS
+    const {data:skuRows,error:e1}=await supa.from('skus').select('*');
+    if(e1)throw e1;
+    if(skuRows&&skuRows.length){
+      SKUS.length=0;
+      skuRows.forEach(r=>SKUS.push({sku:r.sku,kat:r.kategori,tipe:r.tipe,hpp:+r.hpp||0,berat:+r.berat||0,zone:r.zona,plat:r.plat||{}}));
+    }
+    // PROYEKSI
+    const {data:proyRows}=await supa.from('proyeksi').select('*');
+    if(proyRows){Object.keys(PROY).forEach(k=>delete PROY[k]);
+      proyRows.forEach(r=>{if(!PROY[r.month])PROY[r.month]={};PROY[r.month][r.sku]={target:r.target||0,weeks:r.weeks||[]};});}
+    // ADS
+    const {data:adsRows}=await supa.from('ads').select('*').order('id');
+    if(adsRows){ADS.length=0;adsRows.forEach(r=>ADS.push({id:r.id,listing:r.listing,platform:r.platform,spend:+r.spend||0,gmv:+r.gmv||0,roas:+r.roas||0}));}
+    // LISTING_MAP
+    const {data:mapRows}=await supa.from('listing_map').select('*');
+    if(mapRows){Object.keys(LISTING_MAP).forEach(k=>delete LISTING_MAP[k]);
+      mapRows.forEach(r=>{LISTING_MAP[r.listing_key]=r.skus||[];});}
+    dbReady=true;
+    dbStatus('✓ Data tersambung','ok');
+    return true;
+  }catch(e){console.error('Load DB error:',e);dbStatus('⚠️ Gagal memuat data','err');return false;}
+}
+
+// ── SEED awal: kalau DB kosong, isi dari sample data ──
+async function seedDBIfEmpty(){
+  if(!supa)return;
+  try{
+    const {count}=await supa.from('skus').select('*',{count:'exact',head:true});
+    if(count===0){
+      dbStatus('⏳ Mengisi data awal…','save');
+      // push semua SKUS sample ke DB (sekali saja)
+      const rows=SKUS.map(s=>({sku:s.sku,kategori:s.kat,tipe:s.tipe,hpp:s.hpp,berat:s.berat,zona:s.zone,plat:s.plat}));
+      // batch per 500
+      for(let i=0;i<rows.length;i+=500){
+        const {error}=await supa.from('skus').upsert(rows.slice(i,i+500));
+        if(error)throw error;
+      }
+      // seed proyeksi
+      const proyRows=[];
+      Object.entries(PROY).forEach(([month,skus])=>Object.entries(skus).forEach(([sku,d])=>proyRows.push({month,sku,target:d.target||0,weeks:d.weeks||[]})));
+      if(proyRows.length)await supa.from('proyeksi').upsert(proyRows,{onConflict:'month,sku'});
+      // seed listing_map
+      const mapRows=Object.entries(LISTING_MAP).map(([k,skus])=>({listing_key:k,listing_name:k,skus}));
+      if(mapRows.length)await supa.from('listing_map').upsert(mapRows);
+      dbStatus('✓ Data awal tersimpan','ok');
+    }
+  }catch(e){console.error('Seed error:',e);}
+}
+
+// ── SAVE helper (dipanggil saat user ubah data) ──
+async function saveSku(sku){
+  if(!supa||!dbReady)return;
+  const s=SKUS.find(x=>x.sku===sku);if(!s)return;
+  try{await supa.from('skus').upsert({sku:s.sku,kategori:s.kat,tipe:s.tipe,hpp:s.hpp,berat:s.berat,zona:s.zone,plat:s.plat});
+    dbStatus('✓ Tersimpan','save');}catch(e){dbStatus('⚠️ Gagal simpan','err');}
+}
+async function deleteSkuDB(sku){
+  if(!supa||!dbReady)return;
+  try{await supa.from('skus').delete().eq('sku',sku);dbStatus('✓ Terhapus','save');}catch(e){dbStatus('⚠️ Gagal hapus','err');}
+}
+async function saveProy(month,sku){
+  if(!supa||!dbReady)return;
+  const d=PROY[month]&&PROY[month][sku];if(!d)return;
+  try{await supa.from('proyeksi').upsert({month,sku,target:d.target||0,weeks:d.weeks||[]},{onConflict:'month,sku'});
+    dbStatus('✓ Tersimpan','save');}catch(e){dbStatus('⚠️ Gagal simpan','err');}
+}
+async function saveListingMap(key){
+  if(!supa||!dbReady)return;
+  try{await supa.from('listing_map').upsert({listing_key:key,listing_name:key,skus:LISTING_MAP[key]||[]});
+    dbStatus('✓ Mapping tersimpan','save');}catch(e){dbStatus('⚠️ Gagal simpan','err');}
+}
+async function saveAllAds(){
+  if(!supa||!dbReady)return;
+  try{await supa.from('ads').delete().neq('id',-1);
+    if(ADS.length){const rows=ADS.map(a=>({listing:a.listing,platform:a.platform,spend:a.spend,gmv:a.gmv,roas:a.roas}));
+      await supa.from('ads').insert(rows);}
+    dbStatus('✓ Iklan tersimpan','save');}catch(e){dbStatus('⚠️ Gagal simpan','err');}
+}
+
+// ── INIT ──
+async function startApp(){
+  // render dulu pakai sample (biar app cepat muncul)
+  renderKalkulator();renderProyeksi();renderAudit();renderDashboard();renderBase();renderAdsAudit();
+  // sambungkan DB
+  if(initSupa()){
+    await seedDBIfEmpty();
+    await loadFromDB();
+    // render ulang dengan data DB
+    renderKalkulator();renderProyeksi();renderAudit();renderDashboard();renderBase();renderAdsAudit();
+  }else{
+    dbStatus('⚠️ Mode offline (data sementara)','err');
+  }
+}
+startApp();
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </body>
 </html>
