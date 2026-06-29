@@ -2000,7 +2000,9 @@ document.addEventListener('click',e=>{
 // Data model: PROY[month][sku] = {target, weeks:[...]}
 const PROY = {};
 let proyMonth = '2025-06';
-let focusSkus = ['MT-AKARKADAKA-1000','NT-MIRACLE-1KG','GT-SRGTGN-CAKAR'];
+let focusByMonth = {};          // { 'YYYY-MM': ['SKU', ...] }  — tersimpan di DB
+function getFocusList(){ return focusByMonth[proyMonth] || (focusByMonth[proyMonth]=[]); }
+Object.defineProperty(window,'focusSkus',{get(){return getFocusList();},set(v){focusByMonth[proyMonth]=v;}});
 let proyPage = 1; let proySearch='';
 
 // seed demo data for current default month
@@ -2185,10 +2187,10 @@ function focusSearchInput(q){
     <span class="sku-opt-code">${s.sku}</span><span class="sku-opt-kat">${s.kat}</span></div>`).join('');
   drop.classList.add('open');
 }
-function pickFocus(sku){if(!focusSkus.includes(sku)){focusSkus.push(sku);}const inp=document.getElementById('focusSearchInp');if(inp)inp.value='';closeFocusDrop();renderProyeksi();}
+function pickFocus(sku){const list=getFocusList();if(!list.includes(sku)){list.push(sku);saveFocus(proyMonth,sku,true);}const inp=document.getElementById('focusSearchInp');if(inp)inp.value='';closeFocusDrop();renderProyeksi();}
 function closeFocusDrop(){const d=document.getElementById('focusDrop');if(d)d.classList.remove('open');}
 function addFocus(){/* deprecated: pakai pickFocus via search */}
-function removeFocus(sku){focusSkus=focusSkus.filter(s=>s!==sku);renderProyeksi();}
+function removeFocus(sku){focusByMonth[proyMonth]=getFocusList().filter(s=>s!==sku);saveFocus(proyMonth,sku,false);renderProyeksi();}
 
 function renderTrend(){
   const nW=weeksInMonth(proyMonth);
@@ -2817,7 +2819,12 @@ async function loadFromDB(){
     // PROYEKSI
     const {data:proyRows}=await supa.from('proyeksi').select('*');
     if(proyRows){Object.keys(PROY).forEach(k=>delete PROY[k]);
-      proyRows.forEach(r=>{if(!PROY[r.month])PROY[r.month]={};PROY[r.month][r.sku]={target:r.target||0,weeks:r.weeks||[]};});}
+      Object.keys(focusByMonth).forEach(k=>delete focusByMonth[k]);
+      proyRows.forEach(r=>{
+        if(!PROY[r.month])PROY[r.month]={};
+        PROY[r.month][r.sku]={target:r.target||0,weeks:r.weeks||[]};
+        if(r.fokus){if(!focusByMonth[r.month])focusByMonth[r.month]=[];focusByMonth[r.month].push(r.sku);}
+      });}
     // ADS
     const {data:adsRows}=await supa.from('ads').select('*').order('id');
     if(adsRows){ADS.length=0;adsRows.forEach(r=>ADS.push({id:r.id,listing:r.listing,platform:r.platform,spend:+r.spend||0,gmv:+r.gmv||0,roas:+r.roas||0}));}
@@ -2873,6 +2880,13 @@ async function saveProy(month,sku){
   const d=PROY[month]&&PROY[month][sku];if(!d)return;
   try{await supa.from('proyeksi').upsert({month,sku,target:d.target||0,weeks:d.weeks||[]},{onConflict:'month,sku'});
     dbStatus('✓ Tersimpan','save');}catch(e){dbStatus('⚠️ Gagal simpan','err');}
+}
+async function saveFocus(month,sku,isFokus){
+  if(!supa||!dbReady)return;
+  // pastikan ada baris proyeksi utk SKU ini di bulan tsb, lalu set kolom fokus
+  const d=(PROY[month]&&PROY[month][sku])||{target:0,weeks:[]};
+  try{await supa.from('proyeksi').upsert({month,sku,target:d.target||0,weeks:d.weeks||[],fokus:!!isFokus},{onConflict:'month,sku'});
+    dbStatus('✓ SKU fokus tersimpan','save');}catch(e){dbStatus('⚠️ Gagal simpan fokus','err');}
 }
 async function saveListingMap(key){
   if(!supa||!dbReady)return;
