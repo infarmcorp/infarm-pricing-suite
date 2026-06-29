@@ -1655,8 +1655,16 @@ let preserveKalkOrder=false; // true saat render dipicu oleh edit
 function getRows(){
   // attach current-platform pricing
   let rows=SKUS.map((s,i)=>({...s, idx:i, p:s.plat[currentPlat]}));
-  // filter
   const cols=calcColumns(); const colMap={}; cols.forEach(c=>colMap[c.key]=c);
+
+  // MODE EDIT: tampilkan PERSIS baris yang sama (urutan & keanggotaan tetap),
+  // walau nilainya berubah jadi tak cocok filter/sort. Baris tidak loncat / hilang.
+  if(preserveKalkOrder && kalkOrder){
+    const bySku={}; rows.forEach(r=>bySku[r.sku]=r);
+    return kalkOrder.map(sku=>bySku[sku]).filter(Boolean);
+  }
+
+  // filter
   Object.entries(filters).forEach(([key,f])=>{
     const col=colMap[key]; if(!col)return;
     rows=rows.filter(d=>{
@@ -1672,17 +1680,8 @@ function getRows(){
       return true;
     });
   });
-  if(preserveKalkOrder && kalkOrder){
-    // pertahankan urutan tampil sebelumnya (baris tidak loncat saat edit)
-    const pos={}; kalkOrder.forEach((sku,i)=>pos[sku]=i);
-    rows.sort((a,b)=>{
-      const pa=pos[a.sku], pb=pos[b.sku];
-      if(pa==null&&pb==null)return 0;
-      if(pa==null)return 1;   // baris baru taruh di bawah
-      if(pb==null)return -1;
-      return pa-pb;
-    });
-  } else if(sortState.col){
+  // sort
+  if(sortState.col){
     const col=colMap[sortState.col];
     if(col){
       rows.sort((a,b)=>{
@@ -1693,8 +1692,8 @@ function getRows(){
       });
     }
   }
-  // simpan urutan tampil (kecuali sedang preserve, biar tetap konsisten)
-  if(!preserveKalkOrder) kalkOrder=rows.map(r=>r.sku);
+  // simpan urutan tampil terakhir (untuk dipertahankan saat edit)
+  kalkOrder=rows.map(r=>r.sku);
   return rows;
 }
 
