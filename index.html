@@ -152,6 +152,7 @@ tbody tr:last-child td{border-bottom:none}
 .inp:focus{outline:none;border-color:var(--blue);background:var(--blue-soft);box-shadow:0 0 0 2px var(--blue-glow)}
 .inp.editable{border-color:rgba(77,163,255,.35)}
 .inp-s{width:52px}.inp-xs{width:46px}
+.inp-proy{width:64px}
 .sel{border:1px solid rgba(77,163,255,.35);background:var(--bg);border-radius:6px;padding:5px 7px;font-size:10.5px;font-family:'Inter',sans-serif;color:var(--txt);cursor:pointer;max-width:130px}
 .sel:focus{outline:none;border-color:var(--blue)}
 
@@ -238,7 +239,7 @@ tr.row-het-bad td{background:rgba(240,97,109,.05)}
 .pc-month:focus{outline:none;border-color:var(--blue)}
 .pc-days{font-size:11px;color:var(--txt-3)}
 .pc-right{display:flex;align-items:center;gap:7px;flex-wrap:wrap}
-.wk-cell{width:48px}
+.wk-cell{width:56px}
 .fc-pill{display:inline-block;padding:3px 9px;border-radius:99px;font-size:10.5px;font-weight:600;font-family:'JetBrains Mono',monospace}
 /* trend chart */
 .tc-svg{width:100%;height:auto;display:block}
@@ -2095,7 +2096,7 @@ function renderProyTable(){
     html+=`<tr>
       <td class="td-sku">${s.sku}</td>
       <td><span class="cat">${s.kat}</span></td>
-      <td class="num"><input class="inp editable inp-s" type="number" value="${c.target||''}" onchange="updTarget('${s.sku}',this.value)"></td>
+      <td class="num"><input class="inp editable inp-proy" type="number" value="${c.target||''}" onchange="updTarget('${s.sku}',this.value)"></td>
       ${wk}
       <td class="num" style="font-weight:600">${c.real||'–'}</td>
       <td class="num">${c.target?`<span class="pill ${stPill(c.ach)}">${pct(c.ach)}</span>`:'–'}</td>
@@ -2141,7 +2142,7 @@ function renderFocusTable(){
     let wk='';for(let w=0;w<nW;w++)wk+=`<td class="num"><input class="inp editable wk-cell" type="number" value="${c.weeks[w]||''}" onchange="updWeek('${sku}',${w},this.value)"></td>`;
     html+=`<tr>
       <td class="td-sku">${sku}</td><td><span class="cat">${s.kat}</span></td>
-      <td class="num"><input class="inp editable inp-s" type="number" value="${c.target||''}" onchange="updTarget('${sku}',this.value)"></td>
+      <td class="num"><input class="inp editable inp-proy" type="number" value="${c.target||''}" onchange="updTarget('${sku}',this.value)"></td>
       ${wk}
       <td class="num" style="font-weight:600">${c.real||'–'}</td>
       <td class="num">${c.target?`<span class="pill ${stPill(c.ach)}">${pct(c.ach)}</span>`:'–'}</td>
