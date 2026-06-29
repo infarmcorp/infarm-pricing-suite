@@ -518,7 +518,7 @@ tr.row-het-bad td{background:rgba(240,97,109,.05)}
 
       <div class="kpi-row" style="grid-template-columns:1fr 1fr">
         <div class="kpi a-green"><div class="kpi-lbl">Proyeksi Omset Bersih</div><div class="kpi-val" id="pr-omset">–</div><div class="kpi-sub">target × Shopee Mall (after PPN)</div></div>
-        <div class="kpi a-amber"><div class="kpi-lbl">Proyeksi Profit</div><div class="kpi-val" id="pr-profit">–</div><div class="kpi-sub">target × profit/unit Shopee Mall</div></div>
+        <div class="kpi a-amber"><div class="kpi-lbl">Proyeksi Profit</div><div class="kpi-val" id="pr-profit">–</div><div class="kpi-sub" id="pr-profit-s">omset × rata-rata target profit</div></div>
       </div>
 
       <!-- focus table -->
@@ -1649,6 +1649,9 @@ function renderPlatTabs(){
   });
 }
 
+let kalkOrder=null;       // urutan SKU tampil terakhir (untuk pertahankan posisi saat edit)
+let preserveKalkOrder=false; // true saat render dipicu oleh edit
+
 function getRows(){
   // attach current-platform pricing
   let rows=SKUS.map((s,i)=>({...s, idx:i, p:s.plat[currentPlat]}));
@@ -1669,8 +1672,17 @@ function getRows(){
       return true;
     });
   });
-  // sort
-  if(sortState.col){
+  if(preserveKalkOrder && kalkOrder){
+    // pertahankan urutan tampil sebelumnya (baris tidak loncat saat edit)
+    const pos={}; kalkOrder.forEach((sku,i)=>pos[sku]=i);
+    rows.sort((a,b)=>{
+      const pa=pos[a.sku], pb=pos[b.sku];
+      if(pa==null&&pb==null)return 0;
+      if(pa==null)return 1;   // baris baru taruh di bawah
+      if(pb==null)return -1;
+      return pa-pb;
+    });
+  } else if(sortState.col){
     const col=colMap[sortState.col];
     if(col){
       rows.sort((a,b)=>{
@@ -1681,6 +1693,8 @@ function getRows(){
       });
     }
   }
+  // simpan urutan tampil (kecuali sedang preserve, biar tetap konsisten)
+  if(!preserveKalkOrder) kalkOrder=rows.map(r=>r.sku);
   return rows;
 }
 
@@ -1801,8 +1815,8 @@ function delSku(i){
     renderKalkulator();renderProyeksi();renderAudit();renderDashboard();renderBase();
   }
 }
-function upd(i,f,v){snapshot('ubah '+f+' '+SKUS[i].sku);SKUS[i].plat[currentPlat][f]=parseFloat(v)||0;renderKalkulator();saveSku(SKUS[i].sku);}
-function updBase(i,f,v){snapshot('ubah '+f+' '+SKUS[i].sku);SKUS[i][f]=(f==='zone')?v:(parseFloat(v)||0);renderKalkulator();saveSku(SKUS[i].sku);}
+function upd(i,f,v){snapshot('ubah '+f+' '+SKUS[i].sku);SKUS[i].plat[currentPlat][f]=parseFloat(v)||0;preserveKalkOrder=true;renderKalkulator();preserveKalkOrder=false;saveSku(SKUS[i].sku);}
+function updBase(i,f,v){snapshot('ubah '+f+' '+SKUS[i].sku);SKUS[i][f]=(f==='zone')?v:(parseFloat(v)||0);preserveKalkOrder=true;renderKalkulator();preserveKalkOrder=false;saveSku(SKUS[i].sku);}
 function addSku(){
   SKUS.push({sku:'SKU-BARU', kat:'BAG', tipe:'NEW', hpp:0, berat:100, zone:'Jawa ( selain jakarta )',
     plat:{shopee_mall:{harga:0,minbeli:1,tprofit:10,afil:0,ads:0,het:0},shopee_star:{harga:0,minbeli:1,tprofit:10,afil:0,ads:0,het:0},
@@ -2042,15 +2056,19 @@ function renderProyeksi(){
   document.getElementById('proyDays').textContent=`${td} hari · berjalan ${de} hari · ${nW} minggu`;
 
   // summary (all SKUs that have target or realisasi)
-  let tTar=0,tReal=0,tFc=0,tOmset=0,tProfit=0;
+  let tTar=0,tReal=0,tFc=0,tOmset=0,sumTprofit=0,nTprofit=0;
   const monthData=PROY[proyMonth]||{};
   SKUS.forEach(s=>{
     const pd=monthData[s.sku]; if(!pd)return;
     const c=proyCalc(s.sku);
     tTar+=c.target; tReal+=c.real; tFc+=c.forecast;
     const p=s.plat.shopee_mall; const cc=calc({...s,...p},'shopee_mall');
-    tOmset+=cc.afterPPn*c.target; tProfit+=cc.gp*c.target;
+    tOmset+=cc.afterPPn*c.target;
+    // rata-rata target profit (kalkulator, Shopee Mall) dari SKU yang punya target
+    if(c.target>0){ sumTprofit+=(p.tprofit||0); nTprofit++; }
   });
+  const avgTprofit=nTprofit>0?(sumTprofit/nTprofit):0;   // dalam %
+  const tProfit=tOmset*(avgTprofit/100);                 // Omset × rata-rata target profit
   const ach=tTar>0?tReal/tTar:0, fcAch=tTar>0?tFc/tTar:0;
   setKPI('pr-pcs',tTar.toLocaleString('id-ID'));
   setKPI('pr-real',tReal.toLocaleString('id-ID'));
@@ -2060,6 +2078,7 @@ function renderProyeksi(){
   document.getElementById('pr-fc-s').innerHTML='proyeksi '+pct(fcAch)+' '+stLabel(fcAch).split(' ')[0];
   setKPI('pr-omset',fmt(tOmset));
   setKPI('pr-profit',fmt(tProfit));
+  const pps=document.getElementById('pr-profit-s'); if(pps)pps.textContent='omset × rata-rata TP '+avgTprofit.toFixed(1).replace('.',',')+'%';
 
   renderFocusTable();
   renderTrend();
