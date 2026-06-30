@@ -311,6 +311,29 @@ tr.row-het-bad td{background:rgba(240,97,109,.05)}
 .date-lbl{font-size:10px;color:var(--txt-3);text-transform:uppercase;letter-spacing:.5px;font-weight:600}
 .date-inp{background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:6px 9px;font-size:11px;color:var(--txt);font-family:'Inter',sans-serif;color-scheme:dark}
 .date-inp:focus{outline:none;border-color:var(--blue)}
+.ads-listing-cell{max-width:280px;white-space:nowrap!important;overflow:hidden;text-overflow:ellipsis;cursor:help}
+.ads-listing-cell span{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+
+/* ── Audit Iklan: ringkasan status & chart ── */
+.status-row{margin-bottom:16px}
+.status-row:last-child{margin-bottom:0}
+.status-row-top{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px}
+.status-row-lbl{font-size:12px;font-weight:600}
+.status-row-n{font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700;color:var(--txt-2)}
+.status-row-bar{height:8px;border-radius:5px;background:var(--bg);overflow:hidden}
+.status-row-fill{height:100%;border-radius:5px;transition:width .6s cubic-bezier(.4,0,.2,1)}
+.status-row-sub{font-size:10px;color:var(--txt-3);margin-top:5px;font-family:'JetBrains Mono',monospace}
+
+.bichart-legend{display:flex;gap:16px;margin-bottom:14px;font-size:10.5px;color:var(--txt-2)}
+.bichart-legend span{display:flex;align-items:center;gap:6px}
+.bichart-legend i{width:10px;height:10px;border-radius:3px;display:inline-block}
+.bichart-row{margin-bottom:14px}
+.bichart-row:last-child{margin-bottom:0}
+.bichart-lbl{font-size:11px;font-weight:600;color:var(--txt-2);margin-bottom:6px}
+.bichart-bars{display:flex;flex-direction:column;gap:5px}
+.bichart-track{position:relative;height:18px;background:var(--bg);border-radius:5px;overflow:hidden;display:flex;align-items:center}
+.bichart-bar{height:100%;border-radius:5px;transition:width .6s cubic-bezier(.4,0,.2,1);position:absolute;left:0;top:0}
+.bichart-val{position:relative;z-index:1;font-size:9.5px;font-family:'JetBrains Mono',monospace;color:var(--txt);margin-left:8px;font-weight:600;text-shadow:0 1px 3px rgba(0,0,0,.6)}
 
 /* hamburger (sembunyi di desktop) */
 .hamburger{display:none;width:36px;height:36px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--txt);cursor:pointer;align-items:center;justify-content:center;flex-shrink:0}
@@ -765,12 +788,24 @@ tr.row-het-bad td{background:rgba(240,97,109,.05)}
         </div>
       </div>
 
-      <!-- KPI -->
+      <!-- KPI utama -->
       <div class="kpi-row">
-        <div class="kpi a-amber"><div class="kpi-lbl">Total Spend</div><div class="kpi-val" id="ads-spend">–</div><div class="kpi-sub">biaya iklan</div></div>
         <div class="kpi a-blue"><div class="kpi-lbl">Total GMV Iklan</div><div class="kpi-val" id="ads-gmv">–</div><div class="kpi-sub">penjualan dari iklan</div></div>
-        <div class="kpi a-green"><div class="kpi-lbl">Profit Iklan</div><div class="kpi-val" id="ads-profit">–</div><div class="kpi-sub">(GMV × GM) − Spend</div></div>
-        <div class="kpi a-red"><div class="kpi-lbl">Listing Rugi</div><div class="kpi-val" id="ads-cut">–</div><div class="kpi-sub" id="ads-cut-s">perlu di-cut</div></div>
+        <div class="kpi a-amber"><div class="kpi-lbl">Total Spend</div><div class="kpi-val" id="ads-spend">–</div><div class="kpi-sub">biaya iklan</div></div>
+        <div class="kpi a-green"><div class="kpi-lbl">Profit Iklan</div><div class="kpi-val" id="ads-profit">–</div><div class="kpi-sub">GMV × Profit Tanpa Iklan − Spend</div></div>
+        <div class="kpi a-blue"><div class="kpi-lbl">ROAS Rata-rata</div><div class="kpi-val" id="ads-roas">–</div><div class="kpi-sub" id="ads-roas-s">tertimbang spend</div></div>
+      </div>
+
+      <!-- ringkasan status + distribusi -->
+      <div class="dash-grid" style="margin-bottom:16px">
+        <div class="dcard">
+          <div class="dcard-h">Status Listing <span class="dcard-sub">bulan ini</span></div>
+          <div class="dcard-b" id="ads-status-summary"></div>
+        </div>
+        <div class="dcard">
+          <div class="dcard-h">Spend vs GMV per Status <span class="dcard-sub">ke mana budget mengalir</span></div>
+          <div class="dcard-b" id="ads-spend-chart"></div>
+        </div>
       </div>
 
       <!-- perlu mapping -->
@@ -2974,6 +3009,19 @@ function blendedGM(skus, platform, month){
   const avg=gms.reduce((a,b)=>a+b.gm,0)/gms.length;
   return {gm:avg,quality:'rata'};
 }
+// sama seperti blendedGM, tapi pakai "Net Tanpa Iklan" dari Kalkulator
+// (net margin SKU jika ads=0) — dipakai untuk kolom "Blend Profit Tanpa Iklan"
+function blendedNetNoAds(skus, platform, month){
+  if(!skus||!skus.length)return null;
+  const list=skus.map(sku=>{const s=SKUS.find(x=>x.sku===sku);if(!s)return null;const c=calc({...s,...s.plat[platform]},platform);return {sku,v:c.netNoAds};}).filter(Boolean);
+  if(!list.length)return null;
+  if(list.length===1)return {v:list[0].v,quality:'single'};
+  let sumW=0,sumWV=0,anyNow=false,anyPrev=false;
+  list.forEach(g=>{const w=salesWeight(g.sku,platform,month);sumW+=w.w;sumWV+=w.w*g.v;if(w.src==='now')anyNow=true;if(w.src==='prev')anyPrev=true;});
+  if(sumW>0)return {v:sumWV/sumW,quality:anyNow?'tertimbang':(anyPrev?'tertimbang-prev':'tertimbang')};
+  const avg=list.reduce((a,b)=>a+b.v,0)/list.length;
+  return {v:avg,quality:'rata'};
+}
 
 const qualityBadge=q=>{
   if(q==='single')return '<span class="qbadge q-ok">SKU tunggal</span>';
@@ -2992,6 +3040,12 @@ function suggestSkus(listing){
     return {sku:s.sku,score};
   }).filter(x=>x.score>0).sort((a,b)=>b.score-a.score);
   return scored.slice(0,8).map(x=>x.sku);
+}
+
+// pendekkan nama listing utk tampilan tabel (nama asli tetap ada di title/tooltip)
+function shortenListing(name,max=42){
+  if(!name)return '';
+  return name.length>max ? name.slice(0,max).trim()+'…' : name;
 }
 
 function renderAdsAudit(){
@@ -3036,29 +3090,30 @@ function renderAdsAudit(){
   const auditRows=[];
   mapped.forEach(a=>{
     const skus=LISTING_MAP[lkey(a.listing)];
-    const bg=blendedGM(skus,a.platform,month);
-    if(!bg)return;
-    const bep=bg.gm>0?1/bg.gm:9999;
-    const profit=a.gmv*bg.gm-a.spend;
-    const ratio=a.roas/bep;
+    const bn=blendedNetNoAds(skus,a.platform,month);   // dasar keputusan: Profit Tanpa Iklan (netNoAds)
+    if(!bn)return;
+    const bep=bn.v>0?1/bn.v:9999;   // margin <=0 -> BEP mustahil dicapai (selalu Cut)
+    const profit=a.gmv*bn.v-a.spend;
+    const ratio=bn.v>0?a.roas/bep:0;
     let status,stcls;
-    if(ratio>=1.1){status='Scale';stcls='p-pos';}
+    if(bn.v<=0){status='Cut';stcls='p-neg';}
+    else if(ratio>=1.1){status='Scale';stcls='p-pos';}
     else if(ratio>=0.9){status='Optimize';stcls='p-warn';}
     else {status='Cut';stcls='p-neg';}
-    auditRows.push({listing:a.listing,platform:a.platform,skus,spend:a.spend,gmv:a.gmv,roas:a.roas,gm:bg.gm,quality:bg.quality,bep,profit,status,stcls,ratio});
+    auditRows.push({listing:a.listing,listingShort:shortenListing(a.listing),platform:a.platform,skus,spend:a.spend,gmv:a.gmv,roas:a.roas,netNoAds:bn.v,quality:bn.quality,bep,profit,status,stcls,ratio});
   });
   auditRows.forEach(r=>{totSpend+=r.spend;totGmv+=r.gmv;totProfit+=r.profit;if(r.status==='Scale')scale++;if(r.status==='Cut')cut++;});
 
+  // urutan kolom sesuai permintaan: Listing → GMV → Spend → Profit Iklan → Blend Profit Tanpa Iklan → ROAS → BEP ROAS → Status
   tfRegister('adsaudit',[
     {key:'listing',label:'Listing',type:'text',get:r=>r.listing},
     {key:'platform',label:'Platform',type:'text',get:r=>PLATFORMS[r.platform].name},
-    {key:'spend',label:'Spend',type:'num',get:r=>r.spend},
     {key:'gmv',label:'GMV',type:'num',status:r=>r.gmv>0?'pos':'warn',get:r=>r.gmv},
-    {key:'roas',label:'ROAS',type:'num',status:r=>r.ratio>=1.1?'pos':r.ratio>=0.9?'warn':'neg',get:r=>r.roas},
-    {key:'gm',label:'Blended GM',type:'num',status:r=>r.gm>=0.15?'pos':r.gm>=0.05?'warn':'neg',get:r=>r.gm},
-    {key:'kualitas',label:'Kualitas',type:'text',get:r=>r.quality},
-    {key:'bep',label:'BEP ROAS',type:'num',get:r=>r.bep},
+    {key:'spend',label:'Spend',type:'num',get:r=>r.spend},
     {key:'profit',label:'Profit Iklan',type:'num',status:r=>r.profit>0?'pos':r.profit<0?'neg':'warn',get:r=>r.profit},
+    {key:'netNoAds',label:'Blend Profit Tanpa Iklan',type:'num',status:r=>r.netNoAds>0.05?'pos':r.netNoAds>0?'warn':'neg',get:r=>r.netNoAds},
+    {key:'roas',label:'ROAS',type:'num',status:r=>r.ratio>=1.1?'pos':r.ratio>=0.9?'warn':'neg',get:r=>r.roas},
+    {key:'bep',label:'BEP ROAS',type:'num',get:r=>r.bep},
     {key:'status',label:'Status',type:'text',status:r=>r.status==='Scale'?'pos':r.status==='Cut'?'neg':'warn',get:r=>r.status},
   ],renderAdsAudit);
   let sortedRows=tfApply('adsaudit',auditRows);
@@ -3067,19 +3122,18 @@ function renderAdsAudit(){
   sortedRows.forEach(r=>{
     const icon=r.status==='Scale'?'🟢':r.status==='Cut'?'🔴':'🟡';
     th+=`<tr>
-      <td class="td-sku" style="white-space:normal">${r.listing}<br><span style="font-size:9px;color:var(--txt-3)">${r.skus.length} SKU: ${r.skus.join(', ')}</span></td>
+      <td class="td-sku ads-listing-cell" title="${r.listing.replace(/"/g,'&quot;')}">${r.listingShort}<br><span style="font-size:9px;color:var(--txt-3)">${r.skus.length} SKU${r.skus.length>1?'':''}: ${r.skus.slice(0,3).join(', ')}${r.skus.length>3?` +${r.skus.length-3}`:''}</span></td>
       <td><span class="cat">${PLATFORMS[r.platform].name}</span></td>
-      <td class="num">${fmt(r.spend)}</td>
       <td class="num">${fmt(r.gmv)}</td>
-      <td class="num">${r.roas.toFixed(1)}</td>
-      <td class="num">${pct(r.gm)}</td>
-      <td>${qualityBadge(r.quality)}</td>
-      <td class="num">${r.bep.toFixed(1)}</td>
+      <td class="num">${fmt(r.spend)}</td>
       <td class="num" style="font-weight:600;color:${r.profit>=0?'#5FD3A0':'#F58892'}">${r.profit>=0?'+':''}${fmt(r.profit)}</td>
+      <td class="num">${pct(r.netNoAds)} ${qualityBadge(r.quality)}</td>
+      <td class="num">${r.roas.toFixed(1)}</td>
+      <td class="num">${r.bep>999?'∞':r.bep.toFixed(1)}</td>
       <td><span class="pill ${r.stcls}">${icon} ${r.status}</span></td>
     </tr>`;
   });
-  if(!sortedRows.length)th+=`<tr><td colspan="10"><div class="empty">${mapped.length?'Tidak ada baris cocok filter.':'Belum ada listing ter-mapping untuk bulan ini. Upload laporan iklan & petakan listing.'}</div></td></tr>`;
+  if(!sortedRows.length)th+=`<tr><td colspan="9"><div class="empty">${mapped.length?'Tidak ada baris cocok filter.':'Belum ada listing ter-mapping untuk bulan ini. Upload laporan iklan & petakan listing.'}</div></td></tr>`;
   th+='</tbody>';
   document.getElementById('adsTable').innerHTML=th;
 
@@ -3087,8 +3141,44 @@ function renderAdsAudit(){
   setKPI('ads-gmv',fmt(totGmv));
   document.getElementById('ads-profit').textContent=(totProfit>=0?'+':'')+fmt(totProfit);
   document.getElementById('ads-profit').style.color=totProfit>=0?'#5FD3A0':'#F58892';
-  document.getElementById('ads-cut').textContent=cut;
-  document.getElementById('ads-cut-s').textContent=`${cut} cut · ${scale} scale`;
+  const avgRoas=totSpend>0?totGmv/totSpend:0;
+  setKPI('ads-roas',avgRoas?avgRoas.toFixed(2)+'x':'–');
+  document.getElementById('ads-roas-s').textContent=`${sortedRows.length} listing aktif`;
+
+  // ── ringkasan status: jumlah listing + spend per kategori ──
+  const groups={Scale:{n:0,spend:0,gmv:0,color:'#5FD3A0'},Optimize:{n:0,spend:0,gmv:0,color:'#E8BC63'},Cut:{n:0,spend:0,gmv:0,color:'#F58892'}};
+  auditRows.forEach(r=>{const g=groups[r.status];if(g){g.n++;g.spend+=r.spend;g.gmv+=r.gmv;}});
+  const totN=auditRows.length||1;
+  let statusHtml='';
+  Object.entries(groups).forEach(([name,g])=>{
+    const pctN=g.n/totN*100;
+    const label=name==='Scale'?'🟢 Scale — naikkan budget':name==='Optimize'?'🟡 Optimize — pantau dulu':'🔴 Cut — hentikan/turunkan';
+    statusHtml+=`<div class="status-row">
+      <div class="status-row-top"><span class="status-row-lbl">${label}</span><span class="status-row-n">${g.n} listing</span></div>
+      <div class="status-row-bar"><div class="status-row-fill" style="width:${pctN}%;background:${g.color}"></div></div>
+      <div class="status-row-sub">${fmt(g.spend)} spend · ${fmt(g.gmv)} GMV</div>
+    </div>`;
+  });
+  const elSS=document.getElementById('ads-status-summary'); if(elSS)elSS.innerHTML=statusHtml;
+
+  // ── chart spend vs gmv per status (bar ganda horizontal) ──
+  const elSC=document.getElementById('ads-spend-chart');
+  if(elSC){
+    const maxVal=Math.max(...Object.values(groups).map(g=>Math.max(g.spend,g.gmv)),1);
+    let ch=`<div class="bichart-legend"><span><i style="background:var(--blue)"></i>Spend</span><span><i style="background:#5FD3A0"></i>GMV</span></div>`;
+    Object.entries(groups).forEach(([name,g])=>{
+      const wS=Math.max(g.spend/maxVal*100,g.spend>0?2:0), wG=Math.max(g.gmv/maxVal*100,g.gmv>0?2:0);
+      ch+=`<div class="bichart-row">
+        <div class="bichart-lbl">${name}</div>
+        <div class="bichart-bars">
+          <div class="bichart-track"><div class="bichart-bar" style="width:${wS}%;background:linear-gradient(90deg,var(--blue-d),var(--blue))"></div><span class="bichart-val">${fmt(g.spend)}</span></div>
+          <div class="bichart-track"><div class="bichart-bar" style="width:${wG}%;background:linear-gradient(90deg,#2f9d6f,#5FD3A0)"></div><span class="bichart-val">${fmt(g.gmv)}</span></div>
+        </div>
+      </div>`;
+    });
+    elSC.innerHTML=ch;
+  }
+  cut=groups.Cut.n; scale=groups.Scale.n;
   if(typeof applyPerms==='function'&&currentUser)applyPerms();
 }
 function adsSearchFn(v){adsSearch=v;renderAdsAudit();}
