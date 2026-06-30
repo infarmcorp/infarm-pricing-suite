@@ -2252,10 +2252,10 @@ function downloadCalcTemplate(){
   let header, exrow, remark;
   if(isTT){
     header=['SKU','Kategori','HPP','Harga Jual','Min','Berat','Zona','Target Profit','Affiliate','Ads','HET','Keterangan'];
-    exrow=[ex.sku,ex.kat,ex.hpp,ep.harga,ep.minbeli,ex.berat,ex.zone,ep.tprofit,ep.afil,ep.ads,ep.het,'← CONTOH. Kategori "GARDEN TOOLS" kena fee beda. Zona harus sesuai daftar. Hapus baris ini sebelum upload.'];
+    exrow=[ex.sku,ex.kat,ex.hpp,ep.harga,ep.minbeli,ex.berat,ex.zone,ep.tprofit,ep.afil,ep.ads,ep.het,'← CONTOH. Kategori "GARDEN TOOLS" kena fee beda. Zona harus sesuai daftar. Kolom persen boleh ditulis 11 atau format Persen Excel (11%). Hapus baris ini sebelum upload.'];
   } else {
     header=['SKU','Kategori','HPP','Harga Jual','Min','Target Profit','Affiliate','Ads','HET','Keterangan'];
-    exrow=[ex.sku,ex.kat,ex.hpp,ep.harga,ep.minbeli,ep.tprofit,ep.afil,ep.ads,ep.het,'← CONTOH. HPP berlaku semua platform. Persen ditulis angka (mis. 5 = 5%). Hapus baris ini sebelum upload.'];
+    exrow=[ex.sku,ex.kat,ex.hpp,ep.harga,ep.minbeli,ep.tprofit,ep.afil,ep.ads,ep.het,'← CONTOH. HPP berlaku semua platform. Kolom persen boleh ditulis 11 atau format Persen Excel (11%) — dua-duanya terbaca benar. Hapus baris ini sebelum upload.'];
   }
   const aoa=[header,exrow,[' ']];
   const ws=XLSX.utils.aoa_to_sheet(aoa);
@@ -2270,15 +2270,16 @@ function handleCalcUpload(ev){
   const reader=new FileReader();
   reader.onload=e=>{
     try{
-      const wb=XLSX.read(e.target.result,{type:'array'});
-      const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1});
-      applyCalcUpload(rows,plat);
+      const wb=XLSX.read(e.target.result,{type:'array',cellNF:true});
+      const ws=wb.Sheets[wb.SheetNames[0]];
+      const rows=XLSX.utils.sheet_to_json(ws,{header:1});
+      applyCalcUpload(rows,plat,ws);
     }catch(err){alert('Gagal membaca file: '+err.message);}
   };
   reader.readAsArrayBuffer(file);
   ev.target.value='';
 }
-function applyCalcUpload(rows,plat){
+function applyCalcUpload(rows,plat,ws){
   if(!rows||rows.length<2){alert('File kosong / format salah.');return;}
   const H=rows[0].map(h=>String(h||'').trim().toUpperCase());
   const col=name=>H.indexOf(name);
@@ -2292,6 +2293,21 @@ function applyCalcUpload(rows,plat){
   const VALID_ZONES=new Set(ZONES);
   let updated=0,added=0;
   const num=v=>{const n=parseFloat(v);return isNaN(n)?undefined:n;};
+  // pembaca KHUSUS kolom persen: cek FORMAT SEL Excel dulu (paling akurat —
+  // sel berformat "Percentage" selalu desimal apa pun besarnya, mis. 0,5% atau 50%).
+  // Kalau sel TIDAK berformat persen (format umum/angka), pakai apa adanya (11 = 11%).
+  // Fallback (kalau info format tak tersedia): tebak dari besar angka (≤1 → kemungkinan desimal).
+  function numPct(v,rowIdx,colIdx){
+    const n=parseFloat(v); if(isNaN(n))return undefined;
+    if(ws&&colIdx>=0){
+      const ref=XLSX.utils.encode_cell({r:rowIdx,c:colIdx});
+      const cell=ws[ref];
+      if(cell&&cell.z&&String(cell.z).includes('%')) return n*100;   // sel berformat % -> selalu desimal
+      if(cell&&cell.z) return n;                                     // sel berformat lain (angka biasa) -> apa adanya
+    }
+    // tak ada info format -> heuristik lama sebagai fallback
+    return (n>0&&n<=1)?n*100:n;
+  }
   for(let r=1;r<rows.length;r++){
     const row=rows[r]; if(!row||!row[iSku])continue;
     const sku=String(row[iSku]).trim(); if(!sku)continue;
@@ -2317,9 +2333,9 @@ function applyCalcUpload(rows,plat){
     const p=s.plat[plat];
     if((v=num(iHarga>=0?row[iHarga]:undefined))!==undefined)p.harga=v;
     if((v=num(iMin>=0?row[iMin]:undefined))!==undefined)p.minbeli=v||1;
-    if((v=num(iTp>=0?row[iTp]:undefined))!==undefined)p.tprofit=v;
-    if((v=num(iAf>=0?row[iAf]:undefined))!==undefined)p.afil=v;
-    if((v=num(iAd>=0?row[iAd]:undefined))!==undefined)p.ads=v;
+    if((v=numPct(iTp>=0?row[iTp]:undefined,r,iTp))!==undefined)p.tprofit=v;
+    if((v=numPct(iAf>=0?row[iAf]:undefined,r,iAf))!==undefined)p.afil=v;
+    if((v=numPct(iAd>=0?row[iAd]:undefined,r,iAd))!==undefined)p.ads=v;
     if((v=num(iHet>=0?row[iHet]:undefined))!==undefined)p.het=v;
   }
   alert(`Upload ${PLATFORMS[plat].name} selesai.\nDiupdate: ${updated} SKU\nDitambah: ${added} SKU baru`);
