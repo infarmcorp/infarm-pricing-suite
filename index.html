@@ -991,14 +991,18 @@ function calc(d, platKey){
   const afterPPn=masuk-ppn;                               // AE
   const opex=afterPPn*OPEX;                               // AF
   const gp=hargaKotor-opex-totalFeeMP-hppTotal;           // AG
-  const gm=hargaKotor>0?gp/hargaKotor:0;                  // AH
-  const tprofit=d.tprofit/100;                            // AI
-  const budgetMktKotor=hargaKotor>0?((gm-tprofit)*afterPPn)/hargaKotor:0; // AL
+  const gm=hargaKotor>0?gp/hargaKotor:0;                  // AH (Gross profit %)
+  const tprofit=d.tprofit/100;                            // AI (target profit)
+  // AJ = % budget marketing dari omset bersih = AH - AI; di file: kalau negatif -> 0
+  const pctBudgetBersih=Math.max(gm-tprofit,0);           // AJ (clamp ke 0)
+  const budgetMktKotor=hargaKotor>0?(pctBudgetBersih*afterPPn)/hargaKotor:0; // AL
+  // AP = NETT kotor = AL - affiliate - ads
   const nettKotor=budgetMktKotor-(d.afil/100)-(d.ads/100);// AP
-  const net=afterPPn>0?(hargaKotor*nettKotor)/afterPPn:0; // AR
+  // AR = Net bersih = (AB × AP) / AE ; di file tidak pernah negatif -> clamp ke 0
+  const net=afterPPn>0?Math.max((hargaKotor*nettKotor)/afterPPn,0):0; // AR
   // Net bersih tanpa iklan (ads dianggap 0)
   const nettKotorNoAds=budgetMktKotor-(d.afil/100);
-  const netNoAds=afterPPn>0?(hargaKotor*nettKotorNoAds)/afterPPn:0;
+  const netNoAds=afterPPn>0?Math.max((hargaKotor*nettKotorNoAds)/afterPPn,0):0;
   return {adminPct,feePct,logistik,totalFeeMP,masuk,afterPPn,opex,gp,gm,budgetMktKotor,nettKotor,net,netNoAds,hargaKotor,tier:beratToTier(d.berat)};
 }
 
@@ -2167,7 +2171,11 @@ function renderKalkulator(){
   const minusPct=aktif?Math.round(minus/aktif*100):0;
   document.getElementById('calcSummary').innerHTML=`
     <div class="kpi a-green"><div class="kpi-lbl">Total SKU Aktif</div><div class="kpi-val">${aktif}</div><div class="kpi-sub">${aktif} SKU aktif</div></div>
-    <div class="kpi a-red"><div class="kpi-lbl">SKU Margin Minus</div><div class="kpi-val" style="${minus?'color:var(--red)':''}">${minus}</div><div class="kpi-sub">${minusPct}% dari total</div></div>
+    <div class="kpi a-red" style="cursor:pointer" onclick="showMinusSkus()" title="Klik untuk lihat semua SKU margin minus">
+      <div class="kpi-lbl">SKU Margin Minus <span style="font-weight:400;color:var(--txt-3)">(klik utk lihat)</span></div>
+      <div class="kpi-val" style="${minus?'color:var(--red)':''}">${minus}</div>
+      <div class="kpi-sub">${minusPct}% dari total · seluruh ${aktif} SKU, bukan cuma halaman ini</div>
+    </div>
     <div class="kpi a-green"><div class="kpi-lbl">Avg Gross Margin</div><div class="kpi-val">${pct(sumGm/denom)}</div><div class="kpi-sub">sebelum target profit &amp; ads</div></div>
     <div class="kpi a-amber"><div class="kpi-lbl">Avg Target Profit</div><div class="kpi-val">${pct(sumTp/denom)}</div><div class="kpi-sub">rata-rata semua SKU</div></div>`;
 
@@ -2400,6 +2408,15 @@ function quickSort(key){
   curPage=1;renderKalkulator();
 }
 function clearAllFilters(){sortState={col:null,dir:null};filters={};curPage=1;closeFilter();renderKalkulator();}
+function showMinusSkus(){
+  // pakai filter warna GM% = negatif, urutkan dari paling minus, ke halaman 1
+  filters={gm:{status:new Set(['neg']),text:''}};
+  sortState={col:'gm',dir:'asc'};
+  curPage=1;
+  renderKalkulator();
+  // gulir ke tabel
+  document.getElementById('calcTable')?.scrollIntoView({behavior:'smooth',block:'start'});
+}
 
 let activeFilterCol=null;
 function openFilter(e,key){
