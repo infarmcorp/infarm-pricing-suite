@@ -230,6 +230,10 @@ tr.row-het-bad td{background:rgba(240,97,109,.05)}
 .logout-btn{width:28px;height:28px;border-radius:7px;border:1px solid var(--line);background:transparent;color:var(--txt-3);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.14s}
 .logout-btn:hover{background:var(--red-bg);color:var(--red);border-color:var(--red)}
 .logout-btn svg{width:14px;height:14px}
+.mode-toggle{display:inline-flex;background:var(--bg);border:1px solid var(--line);border-radius:9px;padding:3px;gap:2px}
+.mode-btn{background:transparent;border:none;color:var(--txt-3);font-size:11.5px;font-weight:600;padding:6px 12px;border-radius:6px;cursor:pointer;font-family:'Inter',sans-serif;transition:.15s}
+.mode-btn.active{background:var(--blue);color:#06121F}
+.mode-btn:not(.active):hover{color:var(--txt)}
 
 /* proyeksi controls */
 .proy-controls{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;flex-wrap:wrap}
@@ -340,10 +344,6 @@ tr.row-het-bad td{background:rgba(240,97,109,.05)}
       <div class="nav-item" data-page="proyeksi" onclick="nav('proyeksi')">
         <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 3v18h18"/><path d="M7 14l4-4 3 3 5-6"/></svg>
         Proyeksi
-      </div>
-      <div class="nav-item" data-page="audit" onclick="nav('audit')">
-        <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-        Audit
       </div>
       <div class="nav-item" data-page="adsaudit" onclick="nav('adsaudit')">
         <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6"/><rect x="12" y="8" width="3" height="10"/><rect x="17" y="5" width="3" height="13"/></svg>
@@ -471,6 +471,10 @@ tr.row-het-bad td{background:rgba(240,97,109,.05)}
           <span class="pc-days" id="proyDays"></span>
         </div>
         <div class="pc-right">
+          <div class="mode-toggle">
+            <button class="mode-btn active" id="modeUnit" onclick="setProyMode('unit')">📊 Unit (Input)</button>
+            <button class="mode-btn" id="modeRupiah" onclick="setProyMode('rupiah')">💰 Rupiah (Audit)</button>
+          </div>
           <button class="tbtn" onclick="openUploadGuide()">↑ Upload Data Massal</button>
           <input type="file" id="upTarget" accept=".xlsx,.xls" style="display:none" onchange="handleUpload(event,'target')">
           <input type="file" id="upReal" accept=".xlsx,.xls" style="display:none" onchange="handleUpload(event,'realisasi')">
@@ -516,6 +520,8 @@ tr.row-het-bad td{background:rgba(240,97,109,.05)}
         <div class="kpi a-blue"><div class="kpi-lbl">Proyeksi Akhir Bulan</div><div class="kpi-val" id="pr-fc">–</div><div class="kpi-sub" id="pr-fc-s">run-rate harian</div></div>
       </div>
 
+      <!-- ===== UNIT VIEW (Input) ===== -->
+      <div id="proyUnitView">
       <div class="kpi-row" style="grid-template-columns:1fr 1fr">
         <div class="kpi a-green"><div class="kpi-lbl">Proyeksi Omset Bersih</div><div class="kpi-val" id="pr-omset">–</div><div class="kpi-sub">target × Shopee Mall (after PPN)</div></div>
         <div class="kpi a-amber"><div class="kpi-lbl">Proyeksi Profit</div><div class="kpi-val" id="pr-profit">–</div><div class="kpi-sub" id="pr-profit-s">omset × rata-rata target profit</div></div>
@@ -556,21 +562,27 @@ tr.row-het-bad td{background:rgba(240,97,109,.05)}
         <div class="tbl-scroll"><table id="proyTable"></table></div>
         <div class="pager" id="proyPager" style="display:none"></div>
       </div>
+      </div><!-- /proyUnitView -->
+
+      <!-- ===== RUPIAH VIEW (Audit) ===== -->
+      <div id="proyRupiahView" style="display:none">
+        <div class="kpi-row">
+          <div class="kpi a-blue"><div class="kpi-lbl">Omset Real</div><div class="kpi-val" id="au-real">–</div><div class="kpi-sub">aktual berjalan</div></div>
+          <div class="kpi a-green"><div class="kpi-lbl">Est. Profit Real</div><div class="kpi-val" id="au-profit">–</div><div class="kpi-sub">setelah biaya</div></div>
+          <div class="kpi a-amber"><div class="kpi-lbl">Achievement</div><div class="kpi-val" id="au-ach">–</div><div class="kpi-sub">real vs proyeksi</div></div>
+          <div class="kpi a-blue"><div class="kpi-lbl">SKU Tercapai</div><div class="kpi-val" id="au-ok">–</div><div class="kpi-sub">dari total</div></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head">
+            <span class="panel-title">Audit Aktual vs Proyeksi <span class="pg-info">(rupiah)</span></span>
+            <input class="fmenu-search" style="width:180px;margin:0" placeholder="Cari SKU / kategori…" oninput="proySearchFn(this.value)">
+          </div>
+          <div class="tbl-scroll"><table id="auditTable"></table></div>
+        </div>
+      </div>
     </div>
 
-    <!-- AUDIT -->
-    <div class="content page" id="page-audit">
-      <div class="kpi-row">
-        <div class="kpi a-blue"><div class="kpi-lbl">Omset Real</div><div class="kpi-val" id="au-real">–</div><div class="kpi-sub">aktual berjalan</div></div>
-        <div class="kpi a-green"><div class="kpi-lbl">Est. Profit Real</div><div class="kpi-val" id="au-profit">–</div><div class="kpi-sub">setelah biaya</div></div>
-        <div class="kpi a-amber"><div class="kpi-lbl">Achievement</div><div class="kpi-val" id="au-ach">–</div><div class="kpi-sub">real vs proyeksi</div></div>
-        <div class="kpi a-blue"><div class="kpi-lbl">SKU Tercapai</div><div class="kpi-val" id="au-ok">–</div><div class="kpi-sub">dari total</div></div>
-      </div>
-      <div class="panel">
-        <div class="panel-head"><span class="panel-title">Audit Aktual vs Proyeksi</span></div>
-        <div class="tbl-scroll"><table id="auditTable"></table></div>
-      </div>
-    </div>
+    <!-- (halaman Audit lama dihapus, digabung ke Proyeksi) -->
 
     <!-- AUDIT IKLAN -->
     <div class="content page" id="page-adsaudit">
@@ -2052,6 +2064,15 @@ function setProyMonth(v){proyMonth=v;proyPage=1;renderProyeksi();}
 function openUploadGuide(){document.getElementById('uploadGuide').style.display='block';}
 function closeUploadGuide(){document.getElementById('uploadGuide').style.display='none';}
 
+let proyMode='unit';  // 'unit' | 'rupiah'
+function setProyMode(m){
+  proyMode=m;
+  document.getElementById('modeUnit').classList.toggle('active',m==='unit');
+  document.getElementById('modeRupiah').classList.toggle('active',m==='rupiah');
+  document.getElementById('proyUnitView').style.display=m==='unit'?'':'none';
+  document.getElementById('proyRupiahView').style.display=m==='rupiah'?'':'none';
+  if(m==='rupiah')renderAudit();
+}
 function renderProyeksi(){
   const nW=weeksInMonth(proyMonth), de=daysElapsed(proyMonth), td=daysInMonth(proyMonth);
   document.getElementById('proyDays').textContent=`${td} hari · berjalan ${de} hari · ${nW} minggu`;
@@ -2232,7 +2253,7 @@ function updWeek(sku,w,v){snapshot('ubah W'+(w+1)+' '+sku);const d=getProy(sku);
 
 // ── search filter for main proy table ──
 function clearProyFilter(){proySearch='';proyPage=1;document.getElementById('proyClear').style.display='none';renderProyTable();}
-function proySearchFn(v){proySearch=v;proyPage=1;document.getElementById('proyClear').style.display=v?'flex':'none';renderProyTable();}
+function proySearchFn(v){proySearch=v;proyPage=1;const pc=document.getElementById('proyClear');if(pc)pc.style.display=v?'flex':'none';renderProyTable();if(proyMode==='rupiah')renderAudit();}
 
 // ═══════════════════════ UPLOAD / TEMPLATE (xlsx) ═══════════════════════
 function downloadTemplate(kind){
@@ -2326,6 +2347,7 @@ function renderAudit(){
     const pd=md[s.sku]; if(!pd)return;
     const c=proyCalc(s.sku);
     if(!c.target&&!c.real)return;
+    if(typeof proySearch!=='undefined'&&proySearch){const q=proySearch.toLowerCase();if(!(s.sku+' '+s.kat).toLowerCase().includes(q))return;}
     shown++;
     const p=s.plat.shopee_mall;const cc=calc({...s,...p},'shopee_mall');
     const proyOmset=cc.afterPPn*c.target;
@@ -2769,6 +2791,7 @@ function nav(p){
   document.getElementById('ptitle').textContent=TITLES[p][0];
   document.getElementById('psub').textContent=TITLES[p][1];
   closeFilter();
+  if(p==='proyeksi'&&typeof setProyMode==='function')setProyMode(proyMode||'unit');
   if(p==='adsaudit')renderAdsAudit();
   if(p==='users')loadUsers();
   if(typeof applyPerms==='function'&&currentUser)applyPerms();
@@ -2944,7 +2967,6 @@ function applyPerms(){
   });
   // Modul proyeksi/audit/audit-iklan: kalau tak boleh edit, kunci semua input
   lockModule('page-proyeksi', p.proyeksi);
-  lockModule('page-audit', p.audit);
   lockModule('page-adsaudit', p.adsaudit);
   // Sembunyikan menu yang tak relevan untuk staff (opsional, biar bersih)
   // (tetap bisa lihat semua, jadi tidak disembunyikan)
