@@ -150,6 +150,8 @@ body::after{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;opac
 .panel-title{font-size:12.5px;font-weight:600;display:flex;align-items:center;gap:7px}
 .panel-actions{display:flex;gap:7px}
 .tbtn{background:var(--bg-3);border:1px solid var(--line);border-radius:7px;padding:6px 11px;font-size:10.5px;color:var(--txt-2);cursor:pointer;display:flex;align-items:center;gap:5px;font-family:'Inter',sans-serif;transition:.13s}
+.tbtn.danger-outline{border-color:rgba(245,136,146,.4);color:#F8A5AD}
+.tbtn.danger-outline:hover{background:var(--red-bg);border-color:var(--red)}
 .tbtn:hover{background:var(--bg-hover);color:var(--txt);border-color:var(--blue)}
 .tbtn.clear{color:var(--amber);border-color:var(--amber)}
 
@@ -726,14 +728,16 @@ tr.row-het-bad td{background:rgba(240,97,109,.05)}
             <option value="tiktok_mall">TikTok Mall</option>
             <option value="tiktok_powershop">TikTok Powershop</option>
           </select>
-          <label class="pc-lbl" style="margin-left:8px">Bobot bulan</label>
+          <label class="pc-lbl" style="margin-left:8px">Bulan data</label>
           <input type="month" class="pc-month" id="adsMonth" value="2025-06" onchange="renderAdsAudit()">
         </div>
         <div class="pc-right">
+          <button class="tbtn danger-outline" onclick="resetAdsMonth(document.getElementById('adsMonth').value)" title="Kosongkan data iklan bulan yang dipilih saja">🗑 Reset Bulan Ini</button>
           <button class="tbtn" onclick="openAdsUpload()">↑ Upload Laporan Iklan</button>
           <input type="file" id="adsUpFile" accept=".xlsx,.xls" style="display:none" onchange="handleAdsUpload(event)">
         </div>
       </div>
+      <div class="pg-info" style="margin:-6px 0 12px 2px">Data iklan dipisah per bulan — upload bulan ini tidak akan tercampur dengan bulan lain.</div>
 
       <!-- upload guide -->
       <div class="upload-guide" id="adsUploadGuide" style="display:none">
@@ -771,8 +775,13 @@ tr.row-het-bad td{background:rgba(240,97,109,.05)}
 
       <!-- perlu mapping -->
       <div class="panel" id="adsMapPanel" style="margin-bottom:16px;display:none">
-        <div class="panel-head"><span class="panel-title">⚠️ Perlu Mapping <span class="pg-info" id="adsMapCount"></span></span></div>
-        <div class="tbl-scroll" style="max-height:none"><table id="adsMapTable"></table></div>
+        <div class="panel-head">
+          <span class="panel-title">⚠️ Perlu Mapping <span class="pg-info" id="adsMapCount"></span></span>
+          <button class="tbtn" id="adsMapToggle" onclick="toggleMapPanel()">▸ Tampilkan</button>
+        </div>
+        <div id="adsMapBody" style="display:none">
+          <div class="tbl-scroll" style="max-height:340px"><table id="adsMapTable"></table></div>
+        </div>
       </div>
 
       <!-- audit table -->
@@ -2988,19 +2997,19 @@ function suggestSkus(listing){
 function renderAdsAudit(){
   const platFilter=document.getElementById('adsPlat').value;
   const month=document.getElementById('adsMonth').value;
-  let rows=ADS.filter(a=>platFilter==='all'||a.platform===platFilter);
+  // HANYA tampilkan data iklan untuk BULAN yang dipilih (data bulan lain tidak ikut tercampur)
+  let rows=ADS.filter(a=>(a.month||proyMonth)===month && (platFilter==='all'||a.platform===platFilter));
   if(adsSearch){const q=adsSearch.toLowerCase();rows=rows.filter(a=>a.listing.toLowerCase().includes(q));}
 
   // split mapped vs unmapped
   const unmapped=rows.filter(a=>!LISTING_MAP[lkey(a.listing)]||!LISTING_MAP[lkey(a.listing)].length);
   const mapped=rows.filter(a=>LISTING_MAP[lkey(a.listing)]&&LISTING_MAP[lkey(a.listing)].length);
 
-  // ── perlu mapping panel ──
+  // ── perlu mapping panel (bisa dilipat) ──
   const mapPanel=document.getElementById('adsMapPanel');
   if(unmapped.length){
     mapPanel.style.display='block';
-    document.getElementById('adsMapCount').textContent=`(${unmapped.length} listing)`;
-    let mh=`<thead><tr><th><div class="th-inner">Listing</div></th><th><div class="th-inner">Platform</div></th><th><div class="th-inner">SKU terpilih (auto-suggest, bisa koreksi)</div></th><th><div class="th-inner"></div></th></tr></thead><tbody>`;
+    document.getElementById('adsMapCount').textContent=`(${unmapped.length} listing)`;    let mh=`<thead><tr><th><div class="th-inner">Listing</div></th><th><div class="th-inner">Platform</div></th><th><div class="th-inner">SKU terpilih (auto-suggest, bisa koreksi)</div></th><th><div class="th-inner"></div></th></tr></thead><tbody>`;
     unmapped.forEach(a=>{
       const key=lkey(a.listing);
       adsListingByKey[key]=a.listing;
@@ -3022,46 +3031,55 @@ function renderAdsAudit(){
     document.getElementById('adsMapTable').innerHTML=mh;
   } else mapPanel.style.display='none';
 
-  // ── audit table ──
+  // ── audit table (filter universal: urutkan + warna + cari di tiap kolom) ──
   let totSpend=0,totGmv=0,totProfit=0,cut=0,scale=0;
-  let th=`<thead><tr>
-    <th><div class="th-inner">Listing</div></th>
-    <th><div class="th-inner">Platform</div></th>
-    <th><div class="th-inner r">Spend</div></th>
-    <th><div class="th-inner r">GMV</div></th>
-    <th><div class="th-inner r">ROAS</div></th>
-    <th><div class="th-inner r">Blended GM</div></th>
-    <th><div class="th-inner">Kualitas</div></th>
-    <th><div class="th-inner r">BEP ROAS</div></th>
-    <th><div class="th-inner r">Profit Iklan</div></th>
-    <th><div class="th-inner">Status</div></th>
-  </tr></thead><tbody>`;
+  const auditRows=[];
   mapped.forEach(a=>{
     const skus=LISTING_MAP[lkey(a.listing)];
     const bg=blendedGM(skus,a.platform,month);
-    if(!bg){return;}
+    if(!bg)return;
     const bep=bg.gm>0?1/bg.gm:9999;
     const profit=a.gmv*bg.gm-a.spend;
-    totSpend+=a.spend;totGmv+=a.gmv;totProfit+=profit;
-    let status,stcls;
     const ratio=a.roas/bep;
-    if(ratio>=1.1){status='🟢 Scale';stcls='p-pos';scale++;}
-    else if(ratio>=0.9){status='🟡 Optimize';stcls='p-warn';}
-    else {status='🔴 Cut';stcls='p-neg';cut++;}
+    let status,stcls;
+    if(ratio>=1.1){status='Scale';stcls='p-pos';}
+    else if(ratio>=0.9){status='Optimize';stcls='p-warn';}
+    else {status='Cut';stcls='p-neg';}
+    auditRows.push({listing:a.listing,platform:a.platform,skus,spend:a.spend,gmv:a.gmv,roas:a.roas,gm:bg.gm,quality:bg.quality,bep,profit,status,stcls,ratio});
+  });
+  auditRows.forEach(r=>{totSpend+=r.spend;totGmv+=r.gmv;totProfit+=r.profit;if(r.status==='Scale')scale++;if(r.status==='Cut')cut++;});
+
+  tfRegister('adsaudit',[
+    {key:'listing',label:'Listing',type:'text',get:r=>r.listing},
+    {key:'platform',label:'Platform',type:'text',get:r=>PLATFORMS[r.platform].name},
+    {key:'spend',label:'Spend',type:'num',get:r=>r.spend},
+    {key:'gmv',label:'GMV',type:'num',status:r=>r.gmv>0?'pos':'warn',get:r=>r.gmv},
+    {key:'roas',label:'ROAS',type:'num',status:r=>r.ratio>=1.1?'pos':r.ratio>=0.9?'warn':'neg',get:r=>r.roas},
+    {key:'gm',label:'Blended GM',type:'num',status:r=>r.gm>=0.15?'pos':r.gm>=0.05?'warn':'neg',get:r=>r.gm},
+    {key:'kualitas',label:'Kualitas',type:'text',get:r=>r.quality},
+    {key:'bep',label:'BEP ROAS',type:'num',get:r=>r.bep},
+    {key:'profit',label:'Profit Iklan',type:'num',status:r=>r.profit>0?'pos':r.profit<0?'neg':'warn',get:r=>r.profit},
+    {key:'status',label:'Status',type:'text',status:r=>r.status==='Scale'?'pos':r.status==='Cut'?'neg':'warn',get:r=>r.status},
+  ],renderAdsAudit);
+  let sortedRows=tfApply('adsaudit',auditRows);
+
+  let th=tfHeader('adsaudit')+'<tbody>';
+  sortedRows.forEach(r=>{
+    const icon=r.status==='Scale'?'🟢':r.status==='Cut'?'🔴':'🟡';
     th+=`<tr>
-      <td class="td-sku" style="white-space:normal">${a.listing}<br><span style="font-size:9px;color:var(--txt-3)">${skus.length} SKU: ${skus.join(', ')}</span></td>
-      <td><span class="cat">${PLATFORMS[a.platform].name}</span></td>
-      <td class="num">${fmt(a.spend)}</td>
-      <td class="num">${fmt(a.gmv)}</td>
-      <td class="num">${a.roas.toFixed(1)}</td>
-      <td class="num">${pct(bg.gm)}</td>
-      <td>${qualityBadge(bg.quality)}</td>
-      <td class="num">${bep.toFixed(1)}</td>
-      <td class="num" style="font-weight:600;color:${profit>=0?'#5FD3A0':'#F58892'}">${profit>=0?'+':''}${fmt(profit)}</td>
-      <td><span class="pill ${stcls}">${status}</span></td>
+      <td class="td-sku" style="white-space:normal">${r.listing}<br><span style="font-size:9px;color:var(--txt-3)">${r.skus.length} SKU: ${r.skus.join(', ')}</span></td>
+      <td><span class="cat">${PLATFORMS[r.platform].name}</span></td>
+      <td class="num">${fmt(r.spend)}</td>
+      <td class="num">${fmt(r.gmv)}</td>
+      <td class="num">${r.roas.toFixed(1)}</td>
+      <td class="num">${pct(r.gm)}</td>
+      <td>${qualityBadge(r.quality)}</td>
+      <td class="num">${r.bep.toFixed(1)}</td>
+      <td class="num" style="font-weight:600;color:${r.profit>=0?'#5FD3A0':'#F58892'}">${r.profit>=0?'+':''}${fmt(r.profit)}</td>
+      <td><span class="pill ${r.stcls}">${icon} ${r.status}</span></td>
     </tr>`;
   });
-  if(!mapped.length)th+=`<tr><td colspan="10"><div class="empty">Belum ada listing ter-mapping. Upload laporan iklan & petakan listing.</div></td></tr>`;
+  if(!sortedRows.length)th+=`<tr><td colspan="10"><div class="empty">${mapped.length?'Tidak ada baris cocok filter.':'Belum ada listing ter-mapping untuk bulan ini. Upload laporan iklan & petakan listing.'}</div></td></tr>`;
   th+='</tbody>';
   document.getElementById('adsTable').innerHTML=th;
 
@@ -3074,6 +3092,12 @@ function renderAdsAudit(){
   if(typeof applyPerms==='function'&&currentUser)applyPerms();
 }
 function adsSearchFn(v){adsSearch=v;renderAdsAudit();}
+function toggleMapPanel(){
+  const body=document.getElementById('adsMapBody'), btn=document.getElementById('adsMapToggle');
+  const collapsed=body.style.display==='none';
+  body.style.display=collapsed?'':'none';
+  if(btn)btn.textContent=collapsed?'▾ Sembunyikan':'▸ Tampilkan';
+}
 
 // mapping interactions
 function mapAdd(key,sku){if(!sku)return;if(!adsMapDraft[key])adsMapDraft[key]=new Set();adsMapDraft[key].add(sku);renderAdsAudit();}
@@ -3185,6 +3209,7 @@ function applyAdsUpload(wb,plat){
   const validSku=new Set(SKUS.map(s=>s.sku));
   let maxId=ADS.reduce((m,a)=>Math.max(m,a.id),0);
   let addedListing=0, mappedAuto=0, warnings=[];
+  const month=document.getElementById('adsMonth').value||proyMonth;
 
   // cari sheet by nama (fleksibel), fallback ke sheet pertama sebagai single
   const names=wb.SheetNames;
@@ -3194,7 +3219,7 @@ function applyAdsUpload(wb,plat){
   function ingestSingle(rows){
     rows.forEach(row=>{
       if(!row.listing)return;
-      ADS.push({id:++maxId,listing:row.listing,platform:plat,spend:row.spend||0,gmv:row.gmv||0,
+      ADS.push({id:++maxId,month,listing:row.listing,platform:plat,spend:row.spend||0,gmv:row.gmv||0,
         roas:row.roas||((row.spend>0)?(row.gmv/row.spend):0)});
       addedListing++;
       if(row.sku){
@@ -3222,7 +3247,7 @@ function applyAdsUpload(wb,plat){
     order.forEach(k=>{
       const g=groups[k];
       if(g.spend==null&&g.gmv==null){warnings.push(`Listing "${g.listing}" tidak punya angka Spend/GMV — dilewati`);return;}
-      ADS.push({id:++maxId,listing:g.listing,platform:plat,spend:g.spend||0,gmv:g.gmv||0,
+      ADS.push({id:++maxId,month,listing:g.listing,platform:plat,spend:g.spend||0,gmv:g.gmv||0,
         roas:g.roas||((g.spend>0)?(g.gmv/g.spend):0)});
       addedListing++;
       if(g.skus.length){LISTING_MAP[lkey(g.listing)]=g.skus;mappedAuto++;}
@@ -3245,7 +3270,7 @@ function applyAdsUpload(wb,plat){
   closeAdsUpload();renderAdsAudit();
   // simpan ads & mapping ke DB
   if(supa&&dbReady){(async()=>{
-    await saveAllAds();
+    await saveAllAds(month);
     const mapRows=Object.entries(LISTING_MAP).map(([k,skus])=>({listing_key:k,listing_name:k,skus}));
     if(mapRows.length)await supa.from('listing_map').upsert(mapRows);
   })();}
@@ -3338,7 +3363,7 @@ async function loadFromDB(){
       });}
     // ADS
     const {data:adsRows}=await supa.from('ads').select('*').order('id');
-    if(adsRows){ADS.length=0;adsRows.forEach(r=>ADS.push({id:r.id,listing:r.listing,platform:r.platform,spend:+r.spend||0,gmv:+r.gmv||0,roas:+r.roas||0}));}
+    if(adsRows){ADS.length=0;adsRows.forEach(r=>ADS.push({id:r.id,month:r.month||proyMonth,listing:r.listing,platform:r.platform,spend:+r.spend||0,gmv:+r.gmv||0,roas:+r.roas||0}));}
     // LISTING_MAP
     const {data:mapRows}=await supa.from('listing_map').select('*');
     if(mapRows){Object.keys(LISTING_MAP).forEach(k=>delete LISTING_MAP[k]);
@@ -3404,12 +3429,34 @@ async function saveListingMap(key){
   try{await supa.from('listing_map').upsert({listing_key:key,listing_name:key,skus:LISTING_MAP[key]||[]});
     dbStatus('✓ Mapping tersimpan','save');}catch(e){dbStatus('⚠️ Gagal simpan','err');}
 }
-async function saveAllAds(){
+async function saveAllAds(month){
   if(!supa||!dbReady)return;
-  try{await supa.from('ads').delete().neq('id',-1);
-    if(ADS.length){const rows=ADS.map(a=>({listing:a.listing,platform:a.platform,spend:a.spend,gmv:a.gmv,roas:a.roas}));
-      await supa.from('ads').insert(rows);}
-    dbStatus('✓ Iklan tersimpan','save');}catch(e){dbStatus('⚠️ Gagal simpan','err');}
+  month=month||document.getElementById('adsMonth').value||proyMonth;
+  try{
+    // hanya hapus & timpa data BULAN INI saja (bulan lain tidak tersentuh)
+    await supa.from('ads').delete().eq('month',month);
+    const rowsThisMonth=ADS.filter(a=>(a.month||proyMonth)===month);
+    if(rowsThisMonth.length){
+      const rows=rowsThisMonth.map(a=>({month,listing:a.listing,platform:a.platform,spend:a.spend,gmv:a.gmv,roas:a.roas}));
+      await supa.from('ads').insert(rows);
+    }
+    dbStatus('✓ Iklan tersimpan','save');
+  }catch(e){dbStatus('⚠️ Gagal simpan','err');}
+}
+async function resetAdsMonth(month){
+  if(!supa||!dbReady){alert('Database belum tersambung.');return;}
+  const label=new Date(month+'-01').toLocaleDateString('id-ID',{month:'long',year:'numeric'});
+  const countBefore=ADS.filter(a=>(a.month||proyMonth)===month).length;
+  if(!countBefore){alert(`Tidak ada data iklan untuk bulan ${label}.`);return;}
+  if(!confirm(`Kosongkan SEMUA data iklan untuk bulan ${label}?\n\n${countBefore} listing akan dihapus.\nData bulan lain TIDAK akan terpengaruh.\nTindakan ini tidak bisa dibatalkan.`))return;
+  snapshot('reset data iklan '+month);
+  try{
+    await supa.from('ads').delete().eq('month',month);
+    ADS=ADS.filter(a=>(a.month||proyMonth)!==month);
+    logChange('Reset Data Iklan',label,countBefore+' listing','dikosongkan');
+    dbStatus('✓ Data iklan bulan '+label+' dikosongkan','save');
+    renderAdsAudit();
+  }catch(e){dbStatus('⚠️ Gagal reset','err');}
 }
 
 // ── AUTH (Login Google + Role) ──
