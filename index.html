@@ -296,6 +296,9 @@ tr.row-het-bad td{background:rgba(240,97,109,.05)}
 .plat-bg{flex:1;height:9px;background:var(--bg);border-radius:5px;overflow:hidden}
 .plat-bar{height:100%;border-radius:5px;transition:width .6s cubic-bezier(.4,0,.2,1)}
 .plat-p{width:54px;text-align:right;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700}
+.date-lbl{font-size:10px;color:var(--txt-3);text-transform:uppercase;letter-spacing:.5px;font-weight:600}
+.date-inp{background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:6px 9px;font-size:11px;color:var(--txt);font-family:'Inter',sans-serif;color-scheme:dark}
+.date-inp:focus{outline:none;border-color:var(--blue)}
 
 /* hamburger (sembunyi di desktop) */
 .hamburger{display:none;width:36px;height:36px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--txt);cursor:pointer;align-items:center;justify-content:center;flex-shrink:0}
@@ -696,7 +699,7 @@ tr.row-het-bad td{background:rgba(240,97,109,.05)}
         <div class="panel">
           <div class="panel-head">
             <span class="panel-title">Audit Aktual vs Proyeksi <span class="pg-info">(rupiah)</span></span>
-            <input class="fmenu-search" style="width:180px;margin:0" placeholder="Cari SKU / kategori…" oninput="proySearchFn(this.value)">
+            <span class="pg-info">Klik ikon filter di tiap kolom untuk urutkan, warna & cari</span>
           </div>
           <div class="tbl-scroll"><table id="auditTable"></table></div>
         </div>
@@ -839,7 +842,7 @@ tr.row-het-bad td{background:rgba(240,97,109,.05)}
         <div class="panel-head">
           <span class="panel-title">👥 Daftar User</span>
           <div class="panel-actions">
-            <input class="fmenu-search" style="width:200px;margin:0" placeholder="Cari nama / email…" oninput="usSearchFn(this.value)">
+            <span class="pg-info">Klik ikon filter di tiap kolom untuk urutkan & cari</span>
             <button class="tbtn" onclick="loadUsers()">↻ Refresh</button>
           </div>
         </div>
@@ -856,8 +859,14 @@ tr.row-het-bad td{background:rgba(240,97,109,.05)}
       <div class="panel">
         <div class="panel-head">
           <span class="panel-title">🕓 Riwayat Perubahan</span>
-          <div class="panel-actions">
-            <input class="fmenu-search" style="width:200px;margin:0" placeholder="Cari user / SKU / aksi…" oninput="logSearchFn(this.value)">
+          <div class="panel-actions" style="flex-wrap:wrap;align-items:center">
+            <span class="date-lbl">Dari</span>
+            <input type="date" class="date-inp" id="logFrom" onchange="renderLogs()">
+            <span class="date-lbl">Sampai</span>
+            <input type="date" class="date-inp" id="logTo" onchange="renderLogs()">
+            <button class="tbtn" onclick="logQuickRange(7)">7 hari</button>
+            <button class="tbtn" onclick="logQuickRange(30)">30 hari</button>
+            <button class="tbtn clear" id="logRangeClear" style="display:none" onclick="logClearRange()">Reset tanggal</button>
             <button class="tbtn" onclick="loadLogs()">↻ Refresh</button>
           </div>
         </div>
@@ -1787,16 +1796,29 @@ let logSearch='';
 function logSearchFn(v){logSearch=(v||'').toLowerCase();renderLogs();}
 function renderLogs(){
   const el=document.getElementById('logTable'); if(!el)return;
-  let rows=LOGS.slice();
-  if(logSearch)rows=rows.filter(l=>((l.user_name||'')+' '+(l.user_email||'')+' '+(l.aksi||'')+' '+(l.detail||'')).toLowerCase().includes(logSearch));
-  let html=`<thead><tr>
-    <th><div class="th-inner">Waktu</div></th>
-    <th><div class="th-inner">User</div></th>
-    <th><div class="th-inner">Aksi</div></th>
-    <th><div class="th-inner">Detail</div></th>
-    <th><div class="th-inner r">Sebelum</div></th>
-    <th><div class="th-inner r">Sesudah</div></th>
-  </tr></thead><tbody>`;
+  // rentang tanggal
+  const fromEl=document.getElementById('logFrom'), toEl=document.getElementById('logTo');
+  const from=fromEl&&fromEl.value?new Date(fromEl.value+'T00:00:00'):null;
+  const to=toEl&&toEl.value?new Date(toEl.value+'T23:59:59'):null;
+  const clearBtn=document.getElementById('logRangeClear');
+  if(clearBtn)clearBtn.style.display=(from||to)?'flex':'none';
+  let base=LOGS.filter(l=>{
+    if(!l.waktu)return true;
+    const t=new Date(l.waktu);
+    if(from&&t<from)return false;
+    if(to&&t>to)return false;
+    return true;
+  });
+  tfRegister('logs',[
+    {key:'waktu',label:'Waktu',type:'text',get:l=>l.waktu||''},
+    {key:'user',label:'User',type:'text',get:l=>l.user_name||l.user_email||''},
+    {key:'aksi',label:'Aksi',type:'text',get:l=>l.aksi||''},
+    {key:'detail',label:'Detail',type:'text',get:l=>l.detail||''},
+    {key:'sebelum',label:'Sebelum',type:'text',get:l=>l.sebelum||''},
+    {key:'sesudah',label:'Sesudah',type:'text',get:l=>l.sesudah||''},
+  ],renderLogs);
+  let rows=tfApply('logs',base);
+  let html=tfHeader('logs')+'<tbody>';
   rows.forEach(l=>{
     const w=l.waktu?new Date(l.waktu).toLocaleString('id-ID',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):'–';
     html+=`<tr>
@@ -1808,9 +1830,23 @@ function renderLogs(){
       <td class="num" style="color:#5FD3A0;font-weight:600">${l.sesudah||'–'}</td>
     </tr>`;
   });
-  if(!rows.length)html+=`<tr><td colspan="6"><div class="empty">Belum ada riwayat perubahan. Aktivitas akan tercatat di sini.</div></td></tr>`;
+  if(!rows.length)html+=`<tr><td colspan="6"><div class="empty">${base.length===0&&(from||to)?'Tidak ada perubahan di rentang tanggal ini.':'Belum ada riwayat perubahan. Aktivitas akan tercatat di sini.'}</div></td></tr>`;
   html+='</tbody>';
   el.innerHTML=html;
+  // info jumlah
+  const note=document.querySelector('#page-riwayat .info-bar div');
+}
+function logQuickRange(days){
+  const to=new Date(), from=new Date(); from.setDate(from.getDate()-(days-1));
+  const fmt=d=>d.toISOString().slice(0,10);
+  document.getElementById('logFrom').value=fmt(from);
+  document.getElementById('logTo').value=fmt(to);
+  renderLogs();
+}
+function logClearRange(){
+  document.getElementById('logFrom').value='';
+  document.getElementById('logTo').value='';
+  renderLogs();
 }
 function exportAllData(){
   try{
@@ -1876,6 +1912,100 @@ function colStatus(col,d,c){
 }
 
 // ═══════════════════════ FILTER / SORT STATE ═══════════════════════
+// ═══════════════ FILTER UNIVERSAL (untuk semua tabel selain Kalkulator) ═══════════════
+// Tiap tabel daftar: {id, cols:[{key,label,type,get,status?}], render}
+const TF={};            // state per tabel: TF[id]={sort:{col,dir}, filt:{}}
+const TFDEF={};         // definisi tabel
+function tfRegister(id,cols,render){TFDEF[id]={cols,render};if(!TF[id])TF[id]={sort:{col:null,dir:null},filt:{}};}
+function tfHeader(id){
+  // hasilkan <thead> dengan tombol filter di tiap kolom
+  const d=TFDEF[id],st=TF[id];
+  let h='<thead><tr>';
+  d.cols.forEach(c=>{
+    const active=(st.sort.col===c.key)||(st.filt[c.key]&&((st.filt[c.key].status&&st.filt[c.key].status.size)||st.filt[c.key].text));
+    h+=`<th><div class="th-inner ${c.type==='num'?'r':''}">${c.label}
+      <button class="fbtn${active?' on':''}" onclick="tfOpen(event,'${id}','${c.key}')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 4h18l-7 8v6l-4 2v-8z"/></svg>
+      </button></div></th>`;
+  });
+  h+='</tr></thead>';
+  return h;
+}
+function tfApply(id,rows){
+  const d=TFDEF[id],st=TF[id];const colMap={};d.cols.forEach(c=>colMap[c.key]=c);
+  // filter
+  Object.entries(st.filt).forEach(([key,f])=>{
+    const col=colMap[key];if(!col)return;
+    rows=rows.filter(row=>{
+      if(f.status&&f.status.size){const s=col.status?col.status(row):'warn';if(!f.status.has(s))return false;}
+      if(f.text){const v=col.get(row);if(!String(v).toLowerCase().includes(f.text.toLowerCase()))return false;}
+      return true;
+    });
+  });
+  // sort
+  if(st.sort.col){const col=colMap[st.sort.col];if(col){
+    rows=[...rows].sort((a,b)=>{let va=col.get(a),vb=col.get(b);
+      if(col.type==='num'){va=+va||0;vb=+vb||0;return st.sort.dir==='asc'?va-vb:vb-va;}
+      va=String(va).toLowerCase();vb=String(vb).toLowerCase();return st.sort.dir==='asc'?va.localeCompare(vb):vb.localeCompare(va);});
+  }}
+  return rows;
+}
+let tfActive=null;
+function tfOpen(e,id,key){
+  e.stopPropagation();
+  const d=TFDEF[id],st=TF[id];const col=d.cols.find(c=>c.key===key);
+  tfActive={id,key};
+  const m=document.getElementById('fmenu');
+  const f=st.filt[key]||{status:new Set(),text:''};
+  let html=`<div class="fmenu-sec">Urutkan</div>`;
+  html+=`<div class="fmenu-item ${st.sort.col===key&&st.sort.dir==='asc'?'sel':''}" onclick="tfSort('${id}','${key}','asc')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M11 5h10M11 9h7M11 13h4M3 17l3 3 3-3M6 4v16"/></svg>${col.type==='num'?'Terkecil → Terbesar':'A → Z'}</div>`;
+  html+=`<div class="fmenu-item ${st.sort.col===key&&st.sort.dir==='desc'?'sel':''}" onclick="tfSort('${id}','${key}','desc')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M11 5h4M11 9h7M11 13h10M3 7l3-3 3 3M6 4v16"/></svg>${col.type==='num'?'Terbesar → Terkecil':'Z → A'}</div>`;
+  if(col.status){
+    html+=`<div class="fmenu-div"></div><div class="fmenu-sec">Filter warna</div><div class="fmenu-colors">`;
+    [['pos','g','Positif / sehat'],['warn','a','Netral / hampir'],['neg','r','Negatif / minus']].forEach(([v,cls,lbl])=>{
+      const on=f.status&&f.status.has(v);
+      html+=`<div class="fmenu-item ${on?'sel':''}" onclick="tfToggle('${id}','${key}','${v}')"><span class="fdot ${cls}"></span>${lbl}${on?' ✓':''}</div>`;
+    });
+    html+=`</div>`;
+  }
+  html+=`<div class="fmenu-div"></div><div class="fmenu-sec">Cari ${col.type==='num'?'nilai':'teks'}</div>`;
+  html+=`<input class="fmenu-search" id="fsearch" placeholder="${col.type==='num'?'mis. 100':'ketik...'}" value="${f.text||''}" oninput="tfText('${id}','${key}',this.value)">`;
+  html+=`<div class="fmenu-apply"><button class="mini" onclick="tfReset('${id}','${key}')">Reset</button><button class="mini primary" onclick="closeFilter()">Selesai</button></div>`;
+  m.innerHTML=html;m.classList.add('open');
+  const r=e.currentTarget.getBoundingClientRect();let left=r.left;const mw=216;
+  if(left+mw>window.innerWidth-10)left=window.innerWidth-mw-10;
+  m.style.left=left+'px';m.style.top=(r.bottom+6)+'px';
+}
+function tfSort(id,key,dir){TF[id].sort={col:key,dir};TFDEF[id].render();tfReopen(id,key);}
+function tfToggle(id,key,v){const st=TF[id];if(!st.filt[key])st.filt[key]={status:new Set(),text:''};if(!st.filt[key].status)st.filt[key].status=new Set();const s=st.filt[key].status;s.has(v)?s.delete(v):s.add(v);TFDEF[id].render();tfReopen(id,key);}
+function tfText(id,key,v){const st=TF[id];if(!st.filt[key])st.filt[key]={status:new Set(),text:''};st.filt[key].text=v;TFDEF[id].render();}
+function tfReset(id,key){delete TF[id].filt[key];if(TF[id].sort.col===key)TF[id].sort={col:null,dir:null};TFDEF[id].render();closeFilter();}
+function tfReopen(id,key){
+  const m=document.getElementById('fmenu');if(!m.classList.contains('open'))return;
+  // bangun ulang isi menu (state berubah) tanpa pindah posisi
+  const d=TFDEF[id],st=TF[id];const col=d.cols.find(c=>c.key===key);
+  const f=st.filt[key]||{status:new Set(),text:''};
+  let html=`<div class="fmenu-sec">Urutkan</div>`;
+  html+=`<div class="fmenu-item ${st.sort.col===key&&st.sort.dir==='asc'?'sel':''}" onclick="tfSort('${id}','${key}','asc')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M11 5h10M11 9h7M11 13h4M3 17l3 3 3-3M6 4v16"/></svg>${col.type==='num'?'Terkecil → Terbesar':'A → Z'}</div>`;
+  html+=`<div class="fmenu-item ${st.sort.col===key&&st.sort.dir==='desc'?'sel':''}" onclick="tfSort('${id}','${key}','desc')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M11 5h4M11 9h7M11 13h10M3 7l3-3 3 3M6 4v16"/></svg>${col.type==='num'?'Terbesar → Terkecil':'Z → A'}</div>`;
+  if(col.status){
+    html+=`<div class="fmenu-div"></div><div class="fmenu-sec">Filter warna</div><div class="fmenu-colors">`;
+    [['pos','g','Positif / sehat'],['warn','a','Netral / hampir'],['neg','r','Negatif / minus']].forEach(([v,cls,lbl])=>{
+      const on=f.status&&f.status.has(v);
+      html+=`<div class="fmenu-item ${on?'sel':''}" onclick="tfToggle('${id}','${key}','${v}')"><span class="fdot ${cls}"></span>${lbl}${on?' ✓':''}</div>`;
+    });
+    html+=`</div>`;
+  }
+  html+=`<div class="fmenu-div"></div><div class="fmenu-sec">Cari ${col.type==='num'?'nilai':'teks'}</div>`;
+  html+=`<input class="fmenu-search" id="fsearch" placeholder="${col.type==='num'?'mis. 100':'ketik...'}" value="${f.text||''}" oninput="tfText('${id}','${key}',this.value)">`;
+  html+=`<div class="fmenu-apply"><button class="mini" onclick="tfReset('${id}','${key}')">Reset</button><button class="mini primary" onclick="closeFilter()">Selesai</button></div>`;
+  m.innerHTML=html;
+}
+
 let sortState={col:null,dir:null};   // dir: 'asc'|'desc'
 let filters={};                       // col -> {status:Set, text:string}
 let curPage=1; const PAGE_SIZE=50;
@@ -2248,7 +2378,7 @@ function setText(key,v){
   filters[key].text=v; curPage=1; renderKalkulatorKeepMenu(key);
 }
 function resetCol(key){delete filters[key];if(sortState.col===key){sortState={col:null,dir:null};}renderKalkulator();closeFilter();}
-function closeFilter(){document.getElementById('fmenu').classList.remove('open');activeFilterCol=null;}
+function closeFilter(){document.getElementById('fmenu').classList.remove('open');activeFilterCol=null;tfActive=null;}
 function reopenFilter(key){
   // re-render then reopen at same button
   setTimeout(()=>{
@@ -2599,33 +2729,48 @@ function applyUpload(rows,kind,mode){
 
 // ═══════════════════════ AUDIT ═══════════════════════
 function renderAudit(){
-  let html=`<thead><tr><th><div class="th-inner">SKU</div></th><th><div class="th-inner">Kategori</div></th><th><div class="th-inner r">Target</div></th><th><div class="th-inner r">Real (unit)</div></th><th><div class="th-inner r">Proy. Omset</div></th><th><div class="th-inner r">Real Omset</div></th><th><div class="th-inner r">Gap</div></th><th><div class="th-inner">Achievement</div></th><th><div class="th-inner">Status</div></th></tr></thead><tbody>`;
-  let aL=[],tProyOmset=0,tRealOmset=0,ok=0,shown=0;
+  // kumpulkan baris data
+  let data=[]; let tProyOmset=0,tRealOmset=0,ok=0;
   const md=PROY[proyMonth]||{};
   SKUS.forEach(s=>{
     const pd=md[s.sku]; if(!pd)return;
     const c=proyCalc(s.sku);
     if(!c.target&&!c.real)return;
-    if(typeof proySearch!=='undefined'&&proySearch){const q=proySearch.toLowerCase();if(!(s.sku+' '+s.kat).toLowerCase().includes(q))return;}
-    shown++;
     const p=s.plat.shopee_mall;const cc=calc({...s,...p},'shopee_mall');
-    const proyOmset=cc.afterPPn*c.target;
-    const realOmset=cc.afterPPn*c.real;
-    const gap=realOmset-proyOmset;
-    const ach=c.ach;aL.push(ach);tProyOmset+=proyOmset;tRealOmset+=realOmset;if(ach>=1)ok++;
-    const stt=ach>=1?'<span class="pill p-pos">Tercapai</span>':ach>=0.8?'<span class="pill p-warn">Hampir</span>':'<span class="pill p-neg">Tidak</span>';
-    const col=ach>=1?'#5FD3A0':ach>=0.8?'#E8BC63':'#F58892';
-    html+=`<tr><td class="td-sku">${s.sku}</td><td><span class="cat">${s.kat}</span></td>
-      <td class="num">${c.target}</td><td class="num" style="font-weight:600">${c.real}</td>
-      <td class="num">${fmt(proyOmset)}</td><td class="num">${fmt(realOmset)}</td>
-      <td class="num" style="color:${gap>=0?'#5FD3A0':'#F58892'}">${gap>=0?'+':''}${fmt(gap)}</td>
-      <td><div style="width:84px"><div style="font-size:10px;font-weight:600;color:${col};font-family:'JetBrains Mono',monospace;margin-bottom:3px">${pct(ach)}</div><div style="height:5px;background:var(--bg);border-radius:3px;overflow:hidden"><div style="height:100%;width:${Math.min(ach*100,100)}%;background:${col};border-radius:3px"></div></div></div></td>
+    const proyOmset=cc.afterPPn*c.target, realOmset=cc.afterPPn*c.real, gap=realOmset-proyOmset;
+    data.push({sku:s.sku,kat:s.kat,target:c.target,real:c.real,proyOmset,realOmset,gap,ach:c.ach});
+  });
+  // registrasi kolom + filter universal
+  tfRegister('audit',[
+    {key:'sku',label:'SKU',type:'text',get:r=>r.sku},
+    {key:'kat',label:'Kategori',type:'text',get:r=>r.kat},
+    {key:'target',label:'Target',type:'num',status:r=>r.target>0?'pos':'warn',get:r=>r.target},
+    {key:'real',label:'Real (unit)',type:'num',status:r=>r.real>0?'pos':'warn',get:r=>r.real},
+    {key:'proyOmset',label:'Proy. Omset',type:'num',status:r=>r.proyOmset>0?'pos':'warn',get:r=>r.proyOmset},
+    {key:'realOmset',label:'Real Omset',type:'num',status:r=>r.realOmset>0?'pos':'warn',get:r=>r.realOmset},
+    {key:'gap',label:'Gap',type:'num',status:r=>r.gap>0?'pos':r.gap<0?'neg':'warn',get:r=>r.gap},
+    {key:'ach',label:'Achievement',type:'num',status:r=>r.ach>=1?'pos':r.ach>=0.8?'warn':'neg',get:r=>r.ach},
+    {key:'status',label:'Status',type:'text',status:r=>r.ach>=1?'pos':r.ach>=0.8?'warn':'neg',get:r=>r.ach>=1?'Tercapai':r.ach>=0.8?'Hampir':'Tidak'},
+  ],renderAudit);
+  const shown=data.length;
+  data.forEach(r=>{tProyOmset+=r.proyOmset;tRealOmset+=r.realOmset;if(r.ach>=1)ok++;});
+  let rows=tfApply('audit',data);
+
+  let html=tfHeader('audit')+'<tbody>';
+  rows.forEach(r=>{
+    const stt=r.ach>=1?'<span class="pill p-pos">Tercapai</span>':r.ach>=0.8?'<span class="pill p-warn">Hampir</span>':'<span class="pill p-neg">Tidak</span>';
+    const col=r.ach>=1?'#5FD3A0':r.ach>=0.8?'#E8BC63':'#F58892';
+    html+=`<tr><td class="td-sku">${r.sku}</td><td><span class="cat">${r.kat}</span></td>
+      <td class="num">${r.target}</td><td class="num" style="font-weight:600">${r.real}</td>
+      <td class="num">${fmt(r.proyOmset)}</td><td class="num">${fmt(r.realOmset)}</td>
+      <td class="num" style="color:${r.gap>=0?'#5FD3A0':'#F58892'}">${r.gap>=0?'+':''}${fmt(r.gap)}</td>
+      <td><div style="width:84px"><div style="font-size:10px;font-weight:600;color:${col};font-family:'JetBrains Mono',monospace;margin-bottom:3px">${pct(r.ach)}</div><div style="height:5px;background:var(--bg);border-radius:3px;overflow:hidden"><div style="height:100%;width:${Math.min(r.ach*100,100)}%;background:${col};border-radius:3px"></div></div></div></td>
       <td>${stt}</td></tr>`;
   });
-  if(!shown)html+=`<tr><td colspan="9"><div class="empty">Belum ada data. Isi target &amp; realisasi di tab Proyeksi.</div></td></tr>`;
+  if(!rows.length)html+=`<tr><td colspan="9"><div class="empty">${shown?'Tidak ada baris cocok filter.':'Belum ada data. Isi target &amp; realisasi di tab Proyeksi.'}</div></td></tr>`;
   html+='</tbody>';
   document.getElementById('auditTable').innerHTML=html;
-  const avg=aL.length?aL.reduce((a,b)=>a+b,0)/aL.length:0;
+  const avg=tProyOmset>0?tRealOmset/tProyOmset:0;
   document.getElementById('au-real').textContent=fmt(tRealOmset);
   document.getElementById('au-profit').textContent=fmt(tProyOmset);
   document.getElementById('au-ach').textContent=pct(avg);
@@ -2708,18 +2853,34 @@ function renderDashboard(){
 
 // ═══════════════════════ BASE DATA ═══════════════════════
 function renderBase(){
-  let html=`<thead><tr><th><div class="th-inner">SKU</div></th><th><div class="th-inner">Kategori</div></th><th><div class="th-inner">Tipe</div></th><th><div class="th-inner r">HPP</div></th><th><div class="th-inner r">Berat</div></th><th><div class="th-inner">Tier</div></th><th><div class="th-inner">Zona</div></th><th><div class="th-inner r">S.Mall</div></th><th><div class="th-inner r">S.Star</div></th><th><div class="th-inner r">TT.Mall</div></th><th><div class="th-inner r">TT.PS</div></th></tr></thead><tbody>`;
-  SKUS.slice(0,150).forEach(s=>{
+  tfRegister('base',[
+    {key:'sku',label:'SKU',type:'text',get:r=>r.sku},
+    {key:'kat',label:'Kategori',type:'text',get:r=>r.kat},
+    {key:'tipe',label:'Tipe',type:'text',get:r=>r.tipe},
+    {key:'hpp',label:'HPP',type:'num',status:r=>r.hpp>0?'pos':'warn',get:r=>r.hpp},
+    {key:'berat',label:'Berat',type:'num',status:r=>r.berat>0?'pos':'warn',get:r=>r.berat},
+    {key:'tier',label:'Tier',type:'text',get:r=>beratToTier(r.berat)},
+    {key:'zone',label:'Zona',type:'text',get:r=>r.zone},
+    {key:'sm',label:'S.Mall',type:'num',status:r=>r.plat.shopee_mall.harga>0?'pos':'warn',get:r=>r.plat.shopee_mall.harga},
+    {key:'ss',label:'S.Star',type:'num',status:r=>r.plat.shopee_star.harga>0?'pos':'warn',get:r=>r.plat.shopee_star.harga},
+    {key:'tm',label:'TT.Mall',type:'num',status:r=>r.plat.tiktok_mall.harga>0?'pos':'warn',get:r=>r.plat.tiktok_mall.harga},
+    {key:'tps',label:'TT.PS',type:'num',status:r=>r.plat.tiktok_powershop.harga>0?'pos':'warn',get:r=>r.plat.tiktok_powershop.harga},
+  ],renderBase);
+  let rows=tfApply('base',SKUS.slice());
+  const shown=rows.length; rows=rows.slice(0,200);
+  let html=tfHeader('base')+'<tbody>';
+  rows.forEach(s=>{
     html+=`<tr><td class="td-sku">${s.sku}</td><td><span class="cat">${s.kat}</span></td><td><span class="tipe ${tipeC(s.tipe)}">${s.tipe}</span></td>
       <td class="num">${fmt(s.hpp)}</td><td class="num">${s.berat}g</td><td><span class="tier-badge">${beratToTier(s.berat)}</span></td>
       <td style="font-size:10px;color:var(--txt-2)">${s.zone}</td>
       <td class="num">${fmt(s.plat.shopee_mall.harga)}</td><td class="num">${fmt(s.plat.shopee_star.harga)}</td>
       <td class="num">${fmt(s.plat.tiktok_mall.harga)}</td><td class="num">${fmt(s.plat.tiktok_powershop.harga)}</td></tr>`;
   });
+  if(!rows.length)html+=`<tr><td colspan="11"><div class="empty">Tidak ada SKU cocok.</div></td></tr>`;
   html+='</tbody>';
   document.getElementById('baseTable').innerHTML=html;
   const bn=document.getElementById('baseNote');
-  if(bn)bn.textContent=SKUS.length>150?`Menampilkan 150 dari ${SKUS.length} SKU. Gunakan tab Kalkulator untuk lihat & filter semua.`:`${SKUS.length} SKU`;
+  if(bn)bn.textContent=shown>200?`Menampilkan 200 dari ${shown} SKU (hasil filter). Pakai filter kolom untuk persempit.`:`${shown} SKU`;
 }
 
 // ═══════════════════════ AUDIT IKLAN ═══════════════════════
@@ -3341,25 +3502,24 @@ async function loadUsers(){
   }catch(e){dbStatus('⚠️ Gagal memuat user','err');}
 }
 function renderUsers(){
-  let rows=USERS.slice();
-  if(usSearch){const q=usSearch.toLowerCase();rows=rows.filter(u=>(u.nama||'').toLowerCase().includes(q)||(u.email||'').toLowerCase().includes(q));}
   const total=USERS.length;
   const active=USERS.filter(u=>['admin','staff_marketplace','staff_ads','staff_affiliate'].includes(u.role)).length;
   const pending=USERS.filter(u=>u.role==='viewer').length;
   setKPI('us-total',String(total));setKPI('us-active',String(active));setKPI('us-pending',String(pending));
 
-  let html=`<thead><tr>
-    <th><div class="th-inner">Nama</div></th>
-    <th><div class="th-inner">Email</div></th>
-    <th><div class="th-inner">Bergabung</div></th>
-    <th><div class="th-inner">Role</div></th>
-    <th><div class="th-inner">Aksi</div></th>
-  </tr></thead><tbody>`;
+  tfRegister('users',[
+    {key:'nama',label:'Nama',type:'text',get:u=>u.nama||''},
+    {key:'email',label:'Email',type:'text',get:u=>u.email||''},
+    {key:'joined',label:'Bergabung',type:'text',get:u=>u.created_at||''},
+    {key:'role',label:'Role',type:'text',status:u=>u.role==='admin'?'pos':u.role==='nonaktif'?'neg':u.role==='viewer'?'warn':'pos',get:u=>roleLabel(u.role)},
+  ],renderUsers);
+  let rows=tfApply('users',USERS.slice());
+
+  let html=tfHeader('users').replace('</tr></thead>','<th><div class="th-inner">Aksi</div></th></tr></thead>')+'<tbody>';
   rows.forEach(u=>{
     const isMe=currentUser&&u.id===currentUser.id;
     const opts=ROLE_OPTIONS.map(r=>`<option value="${r.v}" ${u.role===r.v?'selected':''}>${r.label}</option>`).join('');
     const joined=u.created_at?new Date(u.created_at).toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'}):'–';
-    const badgeCls=u.role==='admin'?'p-pos':u.role==='nonaktif'?'p-neg':u.role==='viewer'?'p-warn':'';
     html+=`<tr>
       <td class="td-sku" style="white-space:normal">${u.nama||'(tanpa nama)'} ${isMe?'<span style="color:var(--blue);font-size:9px">(kamu)</span>':''}</td>
       <td style="color:var(--txt-2)">${u.email||'–'}</td>
@@ -3368,7 +3528,7 @@ function renderUsers(){
       <td>${isMe?'<span style="color:var(--txt-3);font-size:10px">—</span>':`<button class="tbtn" onclick="setNonaktif('${u.id}')" title="Nonaktifkan akses">🚫 Nonaktifkan</button>`}</td>
     </tr>`;
   });
-  if(!rows.length)html+=`<tr><td colspan="5"><div class="empty">Belum ada user lain. Bagikan link app agar tim bisa login.</div></td></tr>`;
+  if(!rows.length)html+=`<tr><td colspan="5"><div class="empty">Belum ada user cocok. Bagikan link app agar tim bisa login.</div></td></tr>`;
   html+='</tbody>';
   document.getElementById('usersTable').innerHTML=html;
 }
