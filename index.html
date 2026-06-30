@@ -2166,13 +2166,13 @@ function renderKalkulator(){
 
   // summary
   let minus=0,sumGm=0,sumTp=0,aktif=0;
-  SKUS.forEach(s=>{const p=s.plat[currentPlat];if(p.harga<=0)return;aktif++;const c=calc({...s,...p},currentPlat);if(c.gm<0)minus++;sumGm+=c.gm;sumTp+=p.tprofit/100;});
+  SKUS.forEach(s=>{const p=s.plat[currentPlat];if(p.harga<=0)return;aktif++;const c=calc({...s,...p},currentPlat);if(p.tprofit<0)minus++;sumGm+=c.gm;sumTp+=p.tprofit/100;});
   const denom=aktif||1;
   const minusPct=aktif?Math.round(minus/aktif*100):0;
   document.getElementById('calcSummary').innerHTML=`
     <div class="kpi a-green"><div class="kpi-lbl">Total SKU Aktif</div><div class="kpi-val">${aktif}</div><div class="kpi-sub">${aktif} SKU aktif</div></div>
-    <div class="kpi a-red" style="cursor:pointer" onclick="showMinusSkus()" title="Klik untuk lihat semua SKU margin minus">
-      <div class="kpi-lbl">SKU Margin Minus <span style="font-weight:400;color:var(--txt-3)">(klik utk lihat)</span></div>
+    <div class="kpi a-red" style="cursor:pointer" onclick="showMinusSkus()" title="Klik untuk lihat semua SKU dengan target profit minus">
+      <div class="kpi-lbl">SKU Target Profit Minus <span style="font-weight:400;color:var(--txt-3)">(klik utk lihat)</span></div>
       <div class="kpi-val" style="${minus?'color:var(--red)':''}">${minus}</div>
       <div class="kpi-sub">${minusPct}% dari total · seluruh ${aktif} SKU, bukan cuma halaman ini</div>
     </div>
@@ -2409,9 +2409,9 @@ function quickSort(key){
 }
 function clearAllFilters(){sortState={col:null,dir:null};filters={};curPage=1;closeFilter();renderKalkulator();}
 function showMinusSkus(){
-  // pakai filter warna GM% = negatif, urutkan dari paling minus, ke halaman 1
-  filters={gm:{status:new Set(['neg']),text:''}};
-  sortState={col:'gm',dir:'asc'};
+  // pakai filter warna T.PROFIT = negatif, urutkan dari paling minus, ke halaman 1
+  filters={tprofit:{status:new Set(['neg']),text:''}};
+  sortState={col:'tprofit',dir:'asc'};
   curPage=1;
   renderKalkulator();
   // gulir ke tabel
