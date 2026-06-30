@@ -235,6 +235,59 @@ tr.row-het-bad td{background:rgba(240,97,109,.05)}
 .mode-btn.active{background:var(--blue);color:#06121F}
 .mode-btn:not(.active):hover{color:var(--txt)}
 
+/* dashboard widgets */
+.alert-card{display:flex;align-items:center;gap:14px;background:linear-gradient(135deg,rgba(245,136,146,.12),rgba(245,136,146,.04));border:1px solid rgba(245,136,146,.35);border-radius:13px;padding:14px 18px;margin-bottom:16px}
+.alert-ico{font-size:22px;flex-shrink:0}
+.alert-body{flex:1;min-width:0}
+.alert-title{font-size:13px;font-weight:700;color:#F58892;margin-bottom:7px}
+.alert-skus{display:flex;flex-wrap:wrap;gap:6px}
+.alert-chip{font-size:10.5px;font-family:'JetBrains Mono',monospace;background:rgba(245,136,146,.12);border:1px solid rgba(245,136,146,.25);color:#F8A5AD;padding:3px 8px;border-radius:6px}
+.alert-chip b{color:#F58892}
+.dcard-sub{font-size:10px;color:var(--txt-3);font-weight:500;margin-left:6px}
+.rank-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.04)}
+.rank-row:last-child{border-bottom:none}
+.rank-n{width:20px;height:20px;border-radius:6px;background:var(--bg);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:var(--txt-3);flex-shrink:0}
+.rank-sku{flex:1;font-family:'JetBrains Mono',monospace;font-size:11.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rank-gm{font-family:'JetBrains Mono',monospace;font-size:11.5px;font-weight:700}
+.rank-gm.g{color:#5FD3A0}.rank-gm.b{color:#F58892}
+.plat-row{display:flex;align-items:center;gap:12px;padding:9px 0}
+.plat-n{width:110px;font-size:12px;font-weight:600;flex-shrink:0}
+.plat-bg{flex:1;height:9px;background:var(--bg);border-radius:5px;overflow:hidden}
+.plat-bar{height:100%;border-radius:5px;transition:width .6s cubic-bezier(.4,0,.2,1)}
+.plat-p{width:54px;text-align:right;font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:700}
+
+/* hamburger (sembunyi di desktop) */
+.hamburger{display:none;width:36px;height:36px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--txt);cursor:pointer;align-items:center;justify-content:center;flex-shrink:0}
+.hamburger svg{width:18px;height:18px}
+.sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:40}
+
+/* ===== MOBILE (≤820px) ===== */
+@media (max-width:820px){
+  .hamburger{display:flex}
+  .sidebar{position:fixed;left:0;top:0;height:100vh;transform:translateX(-100%);transition:transform .25s ease;z-index:50;width:240px}
+  .sidebar.open{transform:translateX(0)}
+  .sidebar-overlay.show{display:block}
+  .topbar{padding:12px 14px;position:sticky}
+  .content{padding:14px!important}
+  .kpi-row{grid-template-columns:1fr 1fr!important;gap:8px}
+  .kpi-val{font-size:22px}
+  .topbar-r .chip{display:none}              /* sembunyikan chip bulan di HP */
+  .user-name{max-width:80px}
+  .page-title{font-size:17px}
+  .page-sub{font-size:11px}
+  .proy-controls{flex-direction:column;align-items:stretch;gap:10px}
+  .pc-right{flex-wrap:wrap}
+  .mode-toggle{width:100%}
+  .mode-btn{flex:1}
+  .panel-head{flex-direction:column;align-items:stretch;gap:8px}
+  .panel-actions{flex-wrap:wrap}
+  .login-card{padding:30px 22px}
+}
+@media (max-width:480px){
+  .kpi-row{grid-template-columns:1fr!important}
+  .topbar-r .btn{padding:7px 10px;font-size:11px}
+}
+
 /* proyeksi controls */
 .proy-controls{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;flex-wrap:wrap}
 .pc-left{display:flex;align-items:center;gap:10px}
@@ -325,7 +378,8 @@ tr.row-het-bad td{background:rgba(240,97,109,.05)}
 </div>
 
 <div class="app" id="appRoot" style="display:none">
-  <aside class="sidebar">
+  <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+  <aside class="sidebar" id="sidebar">
     <div class="brand">
       <div class="brand-row">
         <div class="brand-mark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2v20M5 8c0 4 3 6 7 6M19 8c0 4-3 6-7 6"/></svg></div>
@@ -362,18 +416,27 @@ tr.row-het-bad td{background:rgba(240,97,109,.05)}
         <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>
         Kelola User
       </div>
+      <div class="nav-item nav-admin" data-page="riwayat" onclick="nav('riwayat')" style="display:none">
+        <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/></svg>
+        Riwayat
+      </div>
     </nav>
   </aside>
 
   <main class="main">
     <div class="topbar">
-      <div>
-        <div class="page-title" id="ptitle">Kalkulator Harga</div>
-        <div class="page-sub" id="psub">Multi-platform per SKU</div>
+      <div style="display:flex;align-items:center;gap:12px;min-width:0">
+        <button class="hamburger" id="hamburger" onclick="toggleSidebar()" aria-label="Menu">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+        <div style="min-width:0">
+          <div class="page-title" id="ptitle">Kalkulator Harga</div>
+          <div class="page-sub" id="psub">Multi-platform per SKU</div>
+        </div>
       </div>
       <div class="topbar-r">
         <div class="chip">Juni 2025</div>
-        <button class="btn">Export</button>
+        <button class="btn" onclick="exportAllData()">⤓ Export</button>
         <div class="user-badge" id="userBadge" style="display:none">
           <div class="user-avatar" id="userAvatar"></div>
           <div class="user-info">
@@ -666,9 +729,30 @@ tr.row-het-bad td{background:rgba(240,97,109,.05)}
         <div class="kpi a-amber"><div class="kpi-lbl">Est. Profit Real</div><div class="kpi-val" id="db-profit">–</div><div class="kpi-sub">bulan berjalan</div></div>
         <div class="kpi a-blue"><div class="kpi-lbl">SKU Aktif</div><div class="kpi-val" id="db-sku">–</div><div class="kpi-sub">diproyeksikan</div></div>
       </div>
+
+      <!-- ALERT margin minus -->
+      <div class="alert-card" id="db-alert" style="display:none">
+        <div class="alert-ico">⚠️</div>
+        <div class="alert-body">
+          <div class="alert-title" id="db-alert-title"></div>
+          <div class="alert-skus" id="db-alert-skus"></div>
+        </div>
+        <button class="tbtn" onclick="nav('kalkulator')">Periksa di Kalkulator →</button>
+      </div>
+
       <div class="dash-grid">
         <div class="dcard"><div class="dcard-h">Achievement per Kategori</div><div class="dcard-b" id="db-kat"></div></div>
         <div class="dcard"><div class="dcard-h">Status SKU Bulan Ini</div><div class="dcard-b" id="db-status"></div></div>
+      </div>
+
+      <div class="dash-grid">
+        <div class="dcard"><div class="dcard-h">🏆 Margin Tertinggi <span class="dcard-sub">Shopee Mall</span></div><div class="dcard-b" id="db-top"></div></div>
+        <div class="dcard"><div class="dcard-h">🔻 Margin Terendah <span class="dcard-sub">perlu perhatian</span></div><div class="dcard-b" id="db-bottom"></div></div>
+      </div>
+
+      <div class="dcard" style="margin-top:14px">
+        <div class="dcard-h">Sebaran Margin per Platform <span class="dcard-sub">rata-rata GM semua SKU</span></div>
+        <div class="dcard-b" id="db-plat"></div>
       </div>
     </div>
 
@@ -702,6 +786,24 @@ tr.row-het-bad td{background:rgba(240,97,109,.05)}
           </div>
         </div>
         <div class="tbl-scroll" style="max-height:none"><table id="usersTable"></table></div>
+      </div>
+    </div>
+
+    <!-- RIWAYAT (audit log, admin) -->
+    <div class="content page" id="page-riwayat">
+      <div class="info-bar" style="border-left-color:var(--blue)">
+        <svg class="icon" viewBox="0 0 24 24" fill="none" stroke="#4DA3FF"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+        <div>Semua perubahan data (harga, target, realisasi, hapus SKU, ubah role) tercatat otomatis di sini — lengkap dengan <b>siapa</b>, <b>ubah apa</b>, dan <b>kapan</b>. Menampilkan 300 aktivitas terakhir.</div>
+      </div>
+      <div class="panel">
+        <div class="panel-head">
+          <span class="panel-title">🕓 Riwayat Perubahan</span>
+          <div class="panel-actions">
+            <input class="fmenu-search" style="width:200px;margin:0" placeholder="Cari user / SKU / aksi…" oninput="logSearchFn(this.value)">
+            <button class="tbtn" onclick="loadLogs()">↻ Refresh</button>
+          </div>
+        </div>
+        <div class="tbl-scroll" style="max-height:none"><table id="logTable"></table></div>
       </div>
     </div>
   </main>
@@ -1601,6 +1703,104 @@ document.addEventListener('keydown',e=>{
   }
 });
 
+// ── AUDIT LOG (riwayat perubahan) ──
+function logChange(aksi,detail,sebelum,sesudah){
+  if(!supa||!dbReady||!currentUser)return;
+  // fire-and-forget, jangan blokir UI
+  supa.from('audit_log').insert({
+    user_email: currentUser.email||'',
+    user_name: (currentUser.user_metadata&&currentUser.user_metadata.full_name)||currentUser.email||'',
+    aksi: aksi,
+    detail: String(detail||''),
+    sebelum: String(sebelum==null?'':sebelum),
+    sesudah: String(sesudah==null?'':sesudah)
+  }).then(()=>{}).catch(()=>{});
+}
+let LOGS=[];
+async function loadLogs(){
+  if(!supa||currentRole!=='admin')return;
+  try{
+    const {data,error}=await supa.from('audit_log').select('*').order('waktu',{ascending:false}).limit(300);
+    if(error)throw error;
+    LOGS=data||[]; renderLogs();
+  }catch(e){dbStatus('⚠️ Gagal memuat riwayat','err');}
+}
+let logSearch='';
+function logSearchFn(v){logSearch=(v||'').toLowerCase();renderLogs();}
+function renderLogs(){
+  const el=document.getElementById('logTable'); if(!el)return;
+  let rows=LOGS.slice();
+  if(logSearch)rows=rows.filter(l=>((l.user_name||'')+' '+(l.user_email||'')+' '+(l.aksi||'')+' '+(l.detail||'')).toLowerCase().includes(logSearch));
+  let html=`<thead><tr>
+    <th><div class="th-inner">Waktu</div></th>
+    <th><div class="th-inner">User</div></th>
+    <th><div class="th-inner">Aksi</div></th>
+    <th><div class="th-inner">Detail</div></th>
+    <th><div class="th-inner r">Sebelum</div></th>
+    <th><div class="th-inner r">Sesudah</div></th>
+  </tr></thead><tbody>`;
+  rows.forEach(l=>{
+    const w=l.waktu?new Date(l.waktu).toLocaleString('id-ID',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'}):'–';
+    html+=`<tr>
+      <td style="color:var(--txt-3);white-space:nowrap">${w}</td>
+      <td style="color:var(--txt-2)">${l.user_name||l.user_email||'–'}</td>
+      <td><span class="cat">${l.aksi||''}</span></td>
+      <td class="td-sku" style="white-space:normal;font-weight:500">${l.detail||''}</td>
+      <td class="num" style="color:var(--txt-3)">${l.sebelum||'–'}</td>
+      <td class="num" style="color:#5FD3A0;font-weight:600">${l.sesudah||'–'}</td>
+    </tr>`;
+  });
+  if(!rows.length)html+=`<tr><td colspan="6"><div class="empty">Belum ada riwayat perubahan. Aktivitas akan tercatat di sini.</div></td></tr>`;
+  html+='</tbody>';
+  el.innerHTML=html;
+}
+function exportAllData(){
+  try{
+    const wb=XLSX.utils.book_new();
+    // Sheet 1: SKU + harga semua platform
+    const plats=['shopee_mall','shopee_star','tiktok_mall','tiktok_powershop'];
+    const platName={shopee_mall:'ShopeeMall',shopee_star:'ShopeeStar',tiktok_mall:'TiktokMall',tiktok_powershop:'TiktokPS'};
+    const skuRows=SKUS.map(s=>{
+      const row={SKU:s.sku,Kategori:s.kat,Tipe:s.tipe,HPP:s.hpp,Berat:s.berat,Zona:s.zone};
+      plats.forEach(pl=>{const p=s.plat[pl]||{};
+        row[platName[pl]+'_Harga']=p.harga||0;
+        row[platName[pl]+'_Min']=p.minbeli||0;
+        row[platName[pl]+'_TargetProfit']=p.tprofit||0;
+        row[platName[pl]+'_Affiliate']=p.afil||0;
+        row[platName[pl]+'_Ads']=p.ads||0;
+        row[platName[pl]+'_HET']=p.het||0;
+      });
+      return row;
+    });
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(skuRows),'SKU & Harga');
+
+    // Sheet 2: Proyeksi & Realisasi (semua bulan)
+    const proyRows=[];
+    Object.entries(PROY).forEach(([month,skus])=>Object.entries(skus).forEach(([sku,d])=>{
+      const row={Bulan:month,SKU:sku,Target:d.target||0};
+      (d.weeks||[]).forEach((w,i)=>row['W'+(i+1)]=w||0);
+      row.Realisasi=(d.weeks||[]).reduce((a,b)=>a+(+b||0),0);
+      row.Fokus=(focusByMonth[month]||[]).includes(sku)?'Ya':'';
+      proyRows.push(row);
+    }));
+    if(proyRows.length)XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(proyRows),'Proyeksi');
+
+    // Sheet 3: Ads / Audit Iklan
+    if(ADS.length){
+      const adsRows=ADS.map(a=>({Listing:a.listing,Platform:a.platform,Spend:a.spend,GMV:a.gmv,ROAS:a.roas}));
+      XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(adsRows),'Audit Iklan');
+    }
+    // Sheet 4: Kamus Listing
+    const mapRows=Object.entries(LISTING_MAP).map(([k,skus])=>({Listing:k,SKU:(skus||[]).join(', ')}));
+    if(mapRows.length)XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(mapRows),'Kamus Listing');
+
+    const today=new Date().toISOString().slice(0,10);
+    XLSX.writeFile(wb,`Infarm_Backup_${today}.xlsx`);
+    dbStatus('✓ Data diekspor (backup)','save');
+  }catch(e){console.error(e);alert('Gagal export: '+e.message);}
+}
+
+// ── EXPORT SEMUA DATA selesai ──
 const statusOf=net=>net>0.0001?'pos':net<-0.0001?'neg':'warn';
 // status warna untuk SEMUA kolom numerik (untuk filter warna seragam)
 function colStatus(col,d,c){
@@ -1821,13 +2021,14 @@ function delSku(i){
   const s=SKUS[i]; if(!s)return;
   if(confirm(`Hapus SKU "${s.sku}"?\nTindakan ini menghapus dari semua platform.`)){
     snapshot('hapus '+s.sku);
+    logChange('Hapus SKU',s.sku,'ada','dihapus');
     deleteSkuDB(s.sku);
     SKUS.splice(i,1);
     renderKalkulator();renderProyeksi();renderAudit();renderDashboard();renderBase();
   }
 }
-function upd(i,f,v){snapshot('ubah '+f+' '+SKUS[i].sku);SKUS[i].plat[currentPlat][f]=parseFloat(v)||0;preserveKalkOrder=true;renderKalkulator();preserveKalkOrder=false;saveSku(SKUS[i].sku);}
-function updBase(i,f,v){snapshot('ubah '+f+' '+SKUS[i].sku);SKUS[i][f]=(f==='zone')?v:(parseFloat(v)||0);preserveKalkOrder=true;renderKalkulator();preserveKalkOrder=false;saveSku(SKUS[i].sku);}
+function upd(i,f,v){const old=SKUS[i].plat[currentPlat][f];snapshot('ubah '+f+' '+SKUS[i].sku);SKUS[i].plat[currentPlat][f]=parseFloat(v)||0;logChange('Ubah '+f.toUpperCase(),SKUS[i].sku+' ('+PLATFORMS[currentPlat].name+')',old,SKUS[i].plat[currentPlat][f]);preserveKalkOrder=true;renderKalkulator();preserveKalkOrder=false;saveSku(SKUS[i].sku);}
+function updBase(i,f,v){const old=SKUS[i][f];snapshot('ubah '+f+' '+SKUS[i].sku);SKUS[i][f]=(f==='zone')?v:(parseFloat(v)||0);logChange('Ubah '+f.toUpperCase(),SKUS[i].sku,old,SKUS[i][f]);preserveKalkOrder=true;renderKalkulator();preserveKalkOrder=false;saveSku(SKUS[i].sku);}
 function addSku(){
   SKUS.push({sku:'SKU-BARU', kat:'BAG', tipe:'NEW', hpp:0, berat:100, zone:'Jawa ( selain jakarta )',
     plat:{shopee_mall:{harga:0,minbeli:1,tprofit:10,afil:0,ads:0,het:0},shopee_star:{harga:0,minbeli:1,tprofit:10,afil:0,ads:0,het:0},
@@ -2248,8 +2449,8 @@ function renderTrend(){
     </div>`;
 }
 
-function updTarget(sku,v){snapshot('ubah target '+sku);getProy(sku).target=parseInt(v)||0;renderProyeksi();saveProy(proyMonth,sku);}
-function updWeek(sku,w,v){snapshot('ubah W'+(w+1)+' '+sku);const d=getProy(sku);if(!d.weeks)d.weeks=[];d.weeks[w]=parseInt(v)||0;renderProyeksi();saveProy(proyMonth,sku);}
+function updTarget(sku,v){const old=getProy(sku).target;snapshot('ubah target '+sku);getProy(sku).target=parseInt(v)||0;logChange('Ubah Target',sku+' ('+proyMonth+')',old,getProy(sku).target);renderProyeksi();saveProy(proyMonth,sku);}
+function updWeek(sku,w,v){const d=getProy(sku);if(!d.weeks)d.weeks=[];const old=d.weeks[w]||0;snapshot('ubah W'+(w+1)+' '+sku);d.weeks[w]=parseInt(v)||0;logChange('Ubah Realisasi W'+(w+1),sku+' ('+proyMonth+')',old,d.weeks[w]);renderProyeksi();saveProy(proyMonth,sku);}
 
 // ── search filter for main proy table ──
 function clearProyFilter(){proySearch='';proyPage=1;document.getElementById('proyClear').style.display='none';renderProyTable();}
@@ -2413,6 +2614,38 @@ function renderDashboard(){
         <div style="display:flex;align-items:center;gap:8px;font-size:11.5px"><div style="width:11px;height:11px;border-radius:3px;background:#F58892"></div>Tidak tercapai — ${fail}</div>
       </div>
     </div>`;
+
+  // ── Margin per SKU (Shopee Mall) untuk alert + top/bottom + platform ──
+  const gmList=SKUS.map(s=>{const p=s.plat.shopee_mall;const c=calc({...s,...p},'shopee_mall');return {sku:s.sku,kat:s.kat,gm:c.gm};}).filter(x=>isFinite(x.gm));
+  // alert margin minus
+  const minus=gmList.filter(x=>x.gm<0).sort((a,b)=>a.gm-b.gm);
+  const alertEl=document.getElementById('db-alert');
+  if(alertEl){
+    if(minus.length){
+      alertEl.style.display='flex';
+      document.getElementById('db-alert-title').textContent=`${minus.length} SKU margin MINUS di Shopee Mall — berpotensi rugi`;
+      document.getElementById('db-alert-skus').innerHTML=minus.slice(0,8).map(x=>`<span class="alert-chip">${x.sku} <b>${pct(x.gm)}</b></span>`).join('')+(minus.length>8?`<span class="alert-chip">+${minus.length-8} lagi</span>`:'');
+    }else alertEl.style.display='none';
+  }
+  // top & bottom margin
+  const sorted=[...gmList].sort((a,b)=>b.gm-a.gm);
+  const top=sorted.slice(0,5), bottom=sorted.slice(-5).reverse();
+  const rankRow=(x,i,good)=>`<div class="rank-row"><span class="rank-n">${i+1}</span><span class="rank-sku">${x.sku}</span><span class="cat">${x.kat}</span><span class="rank-gm ${good?'g':'b'}">${pct(x.gm)}</span></div>`;
+  const topEl=document.getElementById('db-top'); if(topEl)topEl.innerHTML=top.map((x,i)=>rankRow(x,i,true)).join('')||'<div class="empty">–</div>';
+  const botEl=document.getElementById('db-bottom'); if(botEl)botEl.innerHTML=bottom.map((x,i)=>rankRow(x,i,false)).join('')||'<div class="empty">–</div>';
+  // platform comparison (avg GM)
+  const plats=[['shopee_mall','Shopee Mall'],['shopee_star','Shopee Star'],['tiktok_mall','TikTok Mall'],['tiktok_powershop','TikTok PS']];
+  const platEl=document.getElementById('db-plat');
+  if(platEl){
+    let ph='';
+    plats.forEach(([key,name])=>{
+      let sum=0,n=0;SKUS.forEach(s=>{const p=s.plat[key];if(!p)return;const c=calc({...s,...p},key);if(isFinite(c.gm)){sum+=c.gm;n++;}});
+      const avgGm=n?sum/n:0;const w=Math.max(2,Math.min(avgGm*100*2.2,100));
+      const col=avgGm>=0.15?'#5FD3A0':avgGm>=0.05?'#E8BC63':'#F58892';
+      ph+=`<div class="plat-row"><span class="plat-n">${name}</span><div class="plat-bg"><div class="plat-bar" style="width:${w}%;background:${col}"></div></div><span class="plat-p" style="color:${col}">${pct(avgGm)}</span></div>`;
+    });
+    platEl.innerHTML=ph;
+  }
 }
 
 // ═══════════════════════ BASE DATA ═══════════════════════
@@ -2782,8 +3015,17 @@ const TITLES={
   adsaudit:['Audit Iklan','Cut vs Scale per listing'],
   kalkulator:['Kalkulator Harga','Multi-platform per SKU'],
   base:['Base Data SKU','Sumber semua kalkulasi'],
-  users:['Kelola User','Atur akses tim']
+  users:['Kelola User','Atur akses tim'],
+  riwayat:['Riwayat','Log perubahan data']
 };
+function toggleSidebar(){
+  const sb=document.getElementById('sidebar'), ov=document.getElementById('sidebarOverlay');
+  const open=sb.classList.toggle('open'); ov.classList.toggle('show',open);
+}
+function closeSidebar(){
+  const sb=document.getElementById('sidebar'), ov=document.getElementById('sidebarOverlay');
+  if(sb)sb.classList.remove('open'); if(ov)ov.classList.remove('show');
+}
 function nav(p){
   document.querySelectorAll('.page').forEach(el=>el.classList.remove('active'));
   document.getElementById('page-'+p).classList.add('active');
@@ -2791,9 +3033,11 @@ function nav(p){
   document.getElementById('ptitle').textContent=TITLES[p][0];
   document.getElementById('psub').textContent=TITLES[p][1];
   closeFilter();
+  closeSidebar();
   if(p==='proyeksi'&&typeof setProyMode==='function')setProyMode(proyMode||'unit');
   if(p==='adsaudit')renderAdsAudit();
   if(p==='users')loadUsers();
+  if(p==='riwayat')loadLogs();
   if(typeof applyPerms==='function'&&currentUser)applyPerms();
 }
 
@@ -3072,10 +3316,12 @@ function renderUsers(){
 }
 async function changeRole(userId,newRole){
   if(!supa)return;
+  const u0=USERS.find(x=>x.id===userId);const oldRole=u0?u0.role:'?';
   try{
     const {error}=await supa.from('profiles').update({role:newRole}).eq('id',userId);
     if(error)throw error;
     const u=USERS.find(x=>x.id===userId);if(u)u.role=newRole;
+    logChange('Ubah Role User',(u0?u0.email:userId),roleLabel(oldRole),roleLabel(newRole));
     dbStatus('✓ Role diperbarui: '+roleLabel(newRole),'save');
     renderUsers();
   }catch(e){dbStatus('⚠️ Gagal ubah role','err');loadUsers();}
