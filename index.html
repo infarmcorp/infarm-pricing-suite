@@ -334,6 +334,14 @@ tr.row-het-bad td{background:rgba(240,97,109,.05)}
 .bichart-track{position:relative;height:18px;background:var(--bg);border-radius:5px;overflow:hidden;display:flex;align-items:center}
 .bichart-bar{height:100%;border-radius:5px;transition:width .6s cubic-bezier(.4,0,.2,1);position:absolute;left:0;top:0}
 .bichart-val{position:relative;z-index:1;font-size:9.5px;font-family:'JetBrains Mono',monospace;color:var(--txt);margin-left:8px;font-weight:600;text-shadow:0 1px 3px rgba(0,0,0,.6)}
+/* mode upload merge/replace */
+.upmode{display:flex;flex-direction:column;gap:8px;margin:10px 0}
+.upmode-opt{display:flex;gap:10px;align-items:flex-start;padding:11px 13px;border:1px solid var(--line);border-radius:10px;cursor:pointer;transition:.15s;background:var(--bg-3)}
+.upmode-opt:hover{border-color:var(--blue)}
+.upmode-opt input{margin-top:2px;accent-color:var(--blue);flex-shrink:0}
+.upmode-opt b{font-size:12px;color:var(--txt)}
+.upmode-opt span{font-size:10.5px;color:var(--txt-3);line-height:1.5}
+.upmode-opt:has(input:checked){border-color:var(--blue);background:var(--blue-soft)}
 
 /* hamburger (sembunyi di desktop) */
 .hamburger{display:none;width:36px;height:36px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--txt);cursor:pointer;align-items:center;justify-content:center;flex-shrink:0}
@@ -578,8 +586,18 @@ tr.row-het-bad td{background:rgba(240,97,109,.05)}
           <div class="ug-step">
             <div class="ug-num">2</div>
             <div class="ug-content">
-              <div class="ug-step-title">Upload file terisi</div>
-              <div class="ug-step-desc">SKU yang sudah ada akan <b>diupdate</b>, SKU baru otomatis <b>ditambahkan</b>. HPP berlaku untuk semua platform.</div>
+              <div class="ug-step-title">Pilih mode upload</div>
+              <div class="ug-step-desc">Tentukan bagaimana data lama diperlakukan:</div>
+              <div class="upmode">
+                <label class="upmode-opt">
+                  <input type="radio" name="calcUpMode" value="merge" checked>
+                  <div><b>Gabung (Merge)</b><br><span>SKU di file diupdate/ditambah. SKU lain (tidak ada di file) tetap dipertahankan.</span></div>
+                </label>
+                <label class="upmode-opt">
+                  <input type="radio" name="calcUpMode" value="replace">
+                  <div><b>Ganti (Replace)</b><br><span>Hanya SKU di file yang aktif di platform ini. SKU lain <b>dinonaktifkan</b> (harga → 0) khusus di platform ini — data platform lain tidak terpengaruh.</span></div>
+                </label>
+              </div>
               <div class="ug-btns">
                 <button class="tbtn" onclick="document.getElementById('calcUpFile').click()">↑ Upload Data</button>
                 <input type="file" id="calcUpFile" accept=".xlsx,.xls" style="display:none" onchange="handleCalcUpload(event)">
@@ -2319,19 +2337,21 @@ function downloadCalcTemplate(){
 function handleCalcUpload(ev){
   const file=ev.target.files[0]; if(!file)return;
   const plat=document.getElementById('calcUpPlat').value;
+  const mode=(document.querySelector('input[name="calcUpMode"]:checked')||{}).value||'merge';
   const reader=new FileReader();
   reader.onload=e=>{
     try{
       const wb=XLSX.read(e.target.result,{type:'array',cellNF:true});
       const ws=wb.Sheets[wb.SheetNames[0]];
       const rows=XLSX.utils.sheet_to_json(ws,{header:1});
-      applyCalcUpload(rows,plat,ws);
+      applyCalcUpload(rows,plat,ws,mode);
     }catch(err){alert('Gagal membaca file: '+err.message);}
   };
   reader.readAsArrayBuffer(file);
   ev.target.value='';
 }
-function applyCalcUpload(rows,plat,ws){
+function applyCalcUpload(rows,plat,ws,mode){
+  mode=mode||'merge';
   if(!rows||rows.length<2){alert('File kosong / format salah.');return;}
   const H=rows[0].map(h=>String(h||'').trim().toUpperCase());
   const col=name=>H.indexOf(name);
@@ -2343,6 +2363,7 @@ function applyCalcUpload(rows,plat,ws){
         iAd=col('ADS'), iHet=col('HET'), iBerat=col('BERAT'), iZona=col('ZONA');
   const map={}; SKUS.forEach((s,idx)=>map[s.sku]=idx);
   const VALID_ZONES=new Set(ZONES);
+  const skusInFile=new Set();   // untuk mode REPLACE
   let updated=0,added=0;
   const num=v=>{const n=parseFloat(v);return isNaN(n)?undefined:n;};
   // pembaca KHUSUS kolom persen: cek FORMAT SEL Excel dulu (paling akurat —
@@ -2363,6 +2384,7 @@ function applyCalcUpload(rows,plat,ws){
   for(let r=1;r<rows.length;r++){
     const row=rows[r]; if(!row||!row[iSku])continue;
     const sku=String(row[iSku]).trim(); if(!sku)continue;
+    skusInFile.add(sku);
     let s;
     if(map[sku]!==undefined){ s=SKUS[map[sku]]; updated++; }
     else {
@@ -2390,7 +2412,19 @@ function applyCalcUpload(rows,plat,ws){
     if((v=numPct(iAd>=0?row[iAd]:undefined,r,iAd))!==undefined)p.ads=v;
     if((v=num(iHet>=0?row[iHet]:undefined))!==undefined)p.het=v;
   }
-  alert(`Upload ${PLATFORMS[plat].name} selesai.\nDiupdate: ${updated} SKU\nDitambah: ${added} SKU baru`);
+  // mode REPLACE: nonaktifkan SKU yang TIDAK ada di file, KHUSUS platform ini (harga→0)
+  let deactivated=0;
+  if(mode==='replace'){
+    SKUS.forEach(s=>{
+      if(!skusInFile.has(s.sku)){
+        const p=s.plat[plat];
+        if(p&&p.harga>0){ p.harga=0; deactivated++; }
+      }
+    });
+  }
+  let msg=`Upload ${PLATFORMS[plat].name} selesai (mode ${mode==='replace'?'GANTI/Replace':'GABUNG/Merge'}).\nDiupdate: ${updated} SKU\nDitambah: ${added} SKU baru`;
+  if(mode==='replace')msg+=`\nDinonaktifkan di ${PLATFORMS[plat].name} (tidak ada di file): ${deactivated} SKU`;
+  alert(msg);
   closeCalcUpload();
   curPage=1; renderKalkulator(); renderBase();
   // simpan semua perubahan ke DB
@@ -2905,15 +2939,15 @@ function renderDashboard(){
     </div>`;
 
   // ── Margin per SKU (Shopee Mall) untuk alert + top/bottom + platform ──
-  const gmList=SKUS.map(s=>{const p=s.plat.shopee_mall;const c=calc({...s,...p},'shopee_mall');return {sku:s.sku,kat:s.kat,gm:c.gm};}).filter(x=>isFinite(x.gm));
-  // alert margin minus
-  const minus=gmList.filter(x=>x.gm<0).sort((a,b)=>a.gm-b.gm);
+  const gmList=SKUS.map(s=>{const p=s.plat.shopee_mall;const c=calc({...s,...p},'shopee_mall');return {sku:s.sku,kat:s.kat,gm:c.gm,tprofit:p.tprofit,harga:p.harga};}).filter(x=>isFinite(x.gm));
+  // alert: SKU dengan TARGET PROFIT minus (aktif di Shopee Mall)
+  const minus=gmList.filter(x=>x.harga>0&&x.tprofit<0).sort((a,b)=>a.tprofit-b.tprofit);
   const alertEl=document.getElementById('db-alert');
   if(alertEl){
     if(minus.length){
       alertEl.style.display='flex';
-      document.getElementById('db-alert-title').textContent=`${minus.length} SKU margin MINUS di Shopee Mall — berpotensi rugi`;
-      document.getElementById('db-alert-skus').innerHTML=minus.slice(0,8).map(x=>`<span class="alert-chip">${x.sku} <b>${pct(x.gm)}</b></span>`).join('')+(minus.length>8?`<span class="alert-chip">+${minus.length-8} lagi</span>`:'');
+      document.getElementById('db-alert-title').textContent=`${minus.length} SKU target profit MINUS di Shopee Mall — perlu ditinjau`;
+      document.getElementById('db-alert-skus').innerHTML=minus.slice(0,8).map(x=>`<span class="alert-chip">${x.sku} <b>${x.tprofit.toFixed(1)}%</b></span>`).join('')+(minus.length>8?`<span class="alert-chip">+${minus.length-8} lagi</span>`:'');
     }else alertEl.style.display='none';
   }
   // top & bottom margin
