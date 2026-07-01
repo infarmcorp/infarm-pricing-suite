@@ -196,6 +196,10 @@ tbody tr:last-child td{border-bottom:none}
 
 /* inputs */
 .inp{border:1px solid var(--line);background:var(--bg);border-radius:6px;padding:5px 8px;font-size:11px;font-family:'JetBrains Mono',monospace;color:var(--txt);width:84px;text-align:right;transition:.12s}
+/* hilangkan panah naik/turun (spinner) di semua kotak angka */
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+input[type=number]{-moz-appearance:textfield;appearance:textfield}
 .inp:focus{outline:none;border-color:var(--blue);background:var(--blue-soft);box-shadow:0 0 0 2px var(--blue-glow)}
 .inp.editable{border-color:rgba(77,163,255,.35)}
 .inp-s{width:52px}.inp-xs{width:46px}.inp-pct{width:64px}
@@ -2162,7 +2166,11 @@ function tfOpen(e,id,key){
   m.innerHTML=html;m.classList.add('open');
   const r=e.currentTarget.getBoundingClientRect();let left=r.left;const mw=216;
   if(left+mw>window.innerWidth-10)left=window.innerWidth-mw-10;
-  m.style.left=left+'px';m.style.top=(r.bottom+6)+'px';
+  m.style.left=left+'px';
+  const mh=m.offsetHeight||300;
+  const spaceBelow=window.innerHeight-r.bottom;
+  if(spaceBelow<mh+12 && r.top>mh+12){ m.style.top=(r.top-mh-6)+'px'; }
+  else { m.style.top=(r.bottom+6)+'px'; }
 }
 function tfSort(id,key,dir){TF[id].sort={col:key,dir};TFDEF[id].render();tfReopen(id,key);}
 function tfToggle(id,key,v){const st=TF[id];if(!st.filt[key])st.filt[key]={status:new Set(),text:''};if(!st.filt[key].status)st.filt[key].status=new Set();const s=st.filt[key].status;s.has(v)?s.delete(v):s.add(v);TFDEF[id].render();tfReopen(id,key);}
@@ -2597,7 +2605,11 @@ function openFilter(e,key){
   let left=r.left; const mw=216;
   if(left+mw>window.innerWidth-10)left=window.innerWidth-mw-10;
   m.style.left=left+'px';
-  m.style.top=(r.bottom+6)+'px';
+  // buka ke ATAS kalau ruang di bawah tidak cukup
+  const mh=m.offsetHeight||300;
+  const spaceBelow=window.innerHeight-r.bottom;
+  if(spaceBelow<mh+12 && r.top>mh+12){ m.style.top=(r.top-mh-6)+'px'; }
+  else { m.style.top=(r.bottom+6)+'px'; }
 }
 function setSort(key,dir){sortState.col=key;sortState.dir=dir;renderKalkulator();reopenFilter(key);}
 function toggleStatus(key,v){
