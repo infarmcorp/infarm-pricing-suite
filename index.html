@@ -743,8 +743,8 @@ tr.row-het-bad td{background:rgba(240,97,109,.05)}
           <span class="panel-title">Semua SKU — Target &amp; Realisasi</span>
           <div class="panel-actions">
             <button class="tbtn undo-btn" onclick="doUndo()" disabled title="Undo (Ctrl+Z)">↩ Undo</button>
-            <input class="fmenu-search" style="width:180px;margin:0" placeholder="Cari SKU / kategori…" oninput="proySearchFn(this.value)">
-            <button class="tbtn clear" id="proyClear" style="display:none" onclick="clearProyFilter()">Reset</button>
+            <span class="pg-info">Klik ikon filter di tiap kolom · urutan berubah saat "Terapkan", tidak loncat saat input</span>
+            <button class="tbtn clear" onclick="clearProyFilter()">↺ Reset filter</button>
           </div>
         </div>
         <div class="tbl-scroll"><table id="proyTable"></table></div>
@@ -2635,28 +2635,46 @@ function renderProyeksi(){
 
 function weekHeaders(nW){let h='';for(let i=0;i<nW;i++)h+=`<th><div class="th-inner r">W${i+1}</div></th>`;return h;}
 
+let proyOrder=null;        // urutan SKU beku (hasil terakhir "Terapkan")
+let preserveProyOrder=false; // true saat render dipicu oleh edit sel
 function renderProyTable(){
   const nW=weeksInMonth(proyMonth);
-  let rows=SKUS.map((s,i)=>({s,i}));
-  if(proySearch){const q=proySearch.toLowerCase();rows=rows.filter(r=>r.s.sku.toLowerCase().includes(q)||r.s.kat.toLowerCase().includes(q));}
+  // data baris + nilai hasil (untuk filter)
+  let all=SKUS.map((s,i)=>{const c=proyCalc(s.sku);return {s,i,sku:s.sku,kat:s.kat,target:c.target||0,real:c.real||0,ach:c.target?c.ach:-1,fcAch:(c.target&&c.de>0)?c.fcAch:-1,c};});
+
+  // registrasi kolom filter universal (urutkan + warna + cari) — hanya "terapkan" yang mengubah urutan
+  tfRegister('proy',[
+    {key:'sku',label:'SKU',type:'text',get:r=>r.sku},
+    {key:'kat',label:'Kategori',type:'text',get:r=>r.kat},
+    {key:'target',label:'Target',type:'num',status:r=>r.target>0?'pos':'warn',get:r=>r.target},
+    {key:'real',label:'Real',type:'num',status:r=>r.real>0?'pos':'warn',get:r=>r.real},
+    {key:'ach',label:'Ach %',type:'num',status:r=>r.ach<0?'warn':r.ach>=1?'pos':r.ach>=0.8?'warn':'neg',get:r=>r.ach},
+    {key:'fcAch',label:'Proy. %',type:'num',status:r=>r.fcAch<0?'warn':r.fcAch>=1?'pos':r.fcAch>=0.8?'warn':'neg',get:r=>r.fcAch},
+    {key:'status',label:'Status',type:'text',status:r=>r.fcAch<0?'warn':r.fcAch>=1?'pos':r.fcAch>=0.8?'warn':'neg',get:r=>r.fcAch<0?'-':r.fcAch>=1?'Tercapai':r.fcAch>=0.8?'Hampir':'Tidak'},
+  ],applyProyFilter);
+
+  let rows;
+  if(preserveProyOrder && proyOrder){
+    // saat edit: pakai urutan beku, JANGAN sort ulang (baris tidak loncat)
+    const bySku={}; all.forEach(r=>bySku[r.sku]=r);
+    rows=proyOrder.map(sku=>bySku[sku]).filter(Boolean);
+  } else {
+    // saat "Terapkan" / render normal: hitung filter + urutan, lalu bekukan
+    rows=tfApply('proy',all);
+    proyOrder=rows.map(r=>r.sku);
+  }
+
   const totalPages=Math.max(1,Math.ceil(rows.length/PAGE_SIZE));
   if(proyPage>totalPages)proyPage=totalPages;
   const start=(proyPage-1)*PAGE_SIZE;
   const pageRows=rows.slice(start,start+PAGE_SIZE);
 
-  let html=`<thead><tr>
-    <th><div class="th-inner">SKU</div></th>
-    <th><div class="th-inner">Kategori</div></th>
-    <th><div class="th-inner r">Target</div></th>
-    ${weekHeaders(nW)}
-    <th><div class="th-inner r">Real</div></th>
-    <th><div class="th-inner r">Ach %</div></th>
-    <th><div class="th-inner r">Proy. Akhir</div></th>
-    <th><div class="th-inner r">Proy. %</div></th>
-    <th><div class="th-inner">Status</div></th>
-  </tr></thead><tbody>`;
-  pageRows.forEach(({s,i})=>{
-    const c=proyCalc(s.sku);
+  let html=tfHeader('proy');
+  // sisipkan kolom Week (tanpa filter) setelah Target, dan Proy. Akhir sebelum Proy. %
+  html=html.replace(/(<th><div class="th-inner r">Target[\s\S]*?<\/th>)/, '$1'+weekHeaders(nW));
+  html=html.replace(/(<th><div class="th-inner r">Proy. %[\s\S]*?<\/th>)/, '<th><div class="th-inner r">Proy. Akhir</div></th>$1');
+  html+='<tbody>';
+  pageRows.forEach(({s,i,c})=>{
     let wk='';for(let w=0;w<nW;w++)wk+=`<td class="num"><input class="inp editable wk-cell" type="number" value="${c.weeks[w]||''}" onchange="updWeek('${s.sku}',${w},this.value)"></td>`;
     html+=`<tr>
       <td class="td-sku">${s.sku}</td>
@@ -2688,6 +2706,8 @@ function renderProyTable(){
       </div>`;
   } else pg.style.display='none';
 }
+// dipanggil saat filter/urut "diterapkan" — hitung ulang urutan & bekukan
+function applyProyFilter(){preserveProyOrder=false;proyPage=1;renderProyTable();}
 function proyGoPage(p){proyPage=p;renderProyTable();}
 
 function renderFocusTable(){
@@ -2772,12 +2792,12 @@ function renderTrend(){
     </div>`;
 }
 
-function updTarget(sku,v){const old=getProy(sku).target;snapshot('ubah target '+sku);getProy(sku).target=parseInt(v)||0;logChange('Ubah Target',sku+' ('+proyMonth+')',old,getProy(sku).target);renderProyeksi();saveProy(proyMonth,sku);}
-function updWeek(sku,w,v){const d=getProy(sku);if(!d.weeks)d.weeks=[];const old=d.weeks[w]||0;snapshot('ubah W'+(w+1)+' '+sku);d.weeks[w]=parseInt(v)||0;logChange('Ubah Realisasi W'+(w+1),sku+' ('+proyMonth+')',old,d.weeks[w]);renderProyeksi();saveProy(proyMonth,sku);}
+function updTarget(sku,v){const old=getProy(sku).target;snapshot('ubah target '+sku);getProy(sku).target=parseInt(v)||0;logChange('Ubah Target',sku+' ('+proyMonth+')',old,getProy(sku).target);preserveProyOrder=true;renderProyeksi();preserveProyOrder=false;saveProy(proyMonth,sku);}
+function updWeek(sku,w,v){const d=getProy(sku);if(!d.weeks)d.weeks=[];const old=d.weeks[w]||0;snapshot('ubah W'+(w+1)+' '+sku);d.weeks[w]=parseInt(v)||0;logChange('Ubah Realisasi W'+(w+1),sku+' ('+proyMonth+')',old,d.weeks[w]);preserveProyOrder=true;renderProyeksi();preserveProyOrder=false;saveProy(proyMonth,sku);}
 
 // ── search filter for main proy table ──
-function clearProyFilter(){proySearch='';proyPage=1;document.getElementById('proyClear').style.display='none';renderProyTable();}
-function proySearchFn(v){proySearch=v;proyPage=1;const pc=document.getElementById('proyClear');if(pc)pc.style.display=v?'flex':'none';renderProyTable();if(proyMode==='rupiah')renderAudit();}
+function clearProyFilter(){proySearch='';proyPage=1;if(TF.proy){TF.proy.sort={col:null,dir:null};TF.proy.filt={};}preserveProyOrder=false;closeFilter();renderProyTable();}
+function proySearchFn(v){proySearch=v;proyPage=1;if(proyMode==='rupiah')renderAudit();}
 
 // ═══════════════════════ UPLOAD / TEMPLATE (xlsx) ═══════════════════════
 function downloadTemplate(kind){
