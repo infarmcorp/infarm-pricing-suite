@@ -560,7 +560,7 @@ tr.row-het-bad td{background:rgba(240,97,109,.05)}
         </div>
       </div>
       <div class="topbar-r">
-        <div class="chip">Juni 2025</div>
+        <div class="chip" id="topMonthChip">–</div>
         <button class="btn" onclick="exportAllData()">⤓ Export</button>
         <div class="user-badge" id="userBadge" style="display:none">
           <div class="user-avatar" id="userAvatar"></div>
@@ -2624,7 +2624,7 @@ function proyCalc(sku){
 const stPill=a=>a>=1?'p-pos':a>=0.8?'p-warn':'p-neg';
 const stLabel=a=>a>=1?'✅ Tercapai':a>=0.8?'⚠️ Hampir':'❌ Tidak';
 
-function setProyMonth(v){proyMonth=v;proyPage=1;renderProyeksi();}
+function setProyMonth(v){proyMonth=v;proyPage=1;const ps=document.getElementById('psub');if(ps)ps.textContent='Target per SKU — '+monthLabel(v);renderProyeksi();}
 function openUploadGuide(){document.getElementById('uploadGuide').style.display='block';}
 function closeUploadGuide(){document.getElementById('uploadGuide').style.display='none';}
 
@@ -3546,7 +3546,7 @@ function applyAdsUpload(wb,plat){
 // ═══════════════════════ NAV ═══════════════════════
 const TITLES={
   dashboard:['Dashboard','Ringkasan kinerja bulan ini'],
-  proyeksi:['Proyeksi','Target per SKU — Juni 2025'],
+  proyeksi:['Proyeksi','Target per SKU'],
   audit:['Audit','Omset real vs proyeksi'],
   adsaudit:['Audit Iklan','Cut vs Scale per listing'],
   kalkulator:['Kalkulator Harga','Multi-platform per SKU'],
@@ -3567,7 +3567,9 @@ function nav(p){
   document.getElementById('page-'+p).classList.add('active');
   document.querySelectorAll('.nav-item').forEach(el=>el.classList.toggle('active',el.dataset.page===p));
   document.getElementById('ptitle').textContent=TITLES[p][0];
-  document.getElementById('psub').textContent=TITLES[p][1];
+  let sub=TITLES[p][1];
+  if(p==='proyeksi')sub+=' — '+monthLabel(proyMonth);
+  document.getElementById('psub').textContent=sub;
   closeFilter();
   closeSidebar();
   if(p==='proyeksi'&&typeof setProyMode==='function')setProyMode(proyMode||'unit');
@@ -3916,7 +3918,12 @@ function setLogos(){
   try{
     const pm=document.getElementById('proyMonth'); if(pm)pm.value=CURRENT_MONTH;
     const am=document.getElementById('adsMonth'); if(am)am.value=CURRENT_MONTH;
+    const chip=document.getElementById('topMonthChip'); if(chip)chip.textContent=monthLabel(CURRENT_MONTH);
   }catch(e){}
+}
+// format 'YYYY-MM' -> 'Juli 2026'
+function monthLabel(ym){
+  try{return new Date(ym+'-01').toLocaleDateString('id-ID',{month:'long',year:'numeric'});}catch(e){return ym;}
 }
 setLogos();
 function hideSplash(){const s=document.getElementById('loadSplash');if(s){setTimeout(()=>s.classList.add('hide'),250);}}
