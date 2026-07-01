@@ -561,7 +561,7 @@ tr.row-het-bad td{background:rgba(240,97,109,.05)}
       </div>
       <div class="topbar-r">
         <div class="chip" id="topMonthChip">–</div>
-        <button class="btn" onclick="exportAllData()">⤓ Export</button>
+        <button class="btn" onclick="exportAllData()" title="Export data halaman yang sedang dibuka">⤓ Export</button>
         <div class="user-badge" id="userBadge" style="display:none">
           <div class="user-avatar" id="userAvatar"></div>
           <div class="user-info">
@@ -1048,10 +1048,10 @@ function calc(d, platKey){
   // AP = NETT kotor = AL - affiliate - ads
   const nettKotor=budgetMktKotor-(d.afil/100)-(d.ads/100);// AP
   // AR = Net bersih = (AB × AP) / AE ; di file tidak pernah negatif -> clamp ke 0
-  const net=afterPPn>0?Math.max((hargaKotor*nettKotor)/afterPPn,0):0; // AR
+  const net=afterPPn>0?(hargaKotor*nettKotor)/afterPPn:0; // AR (boleh minus jika afil+ads > budget)
   // Net bersih tanpa iklan (ads dianggap 0)
   const nettKotorNoAds=budgetMktKotor-(d.afil/100);
-  const netNoAds=afterPPn>0?Math.max((hargaKotor*nettKotorNoAds)/afterPPn,0):0;
+  const netNoAds=afterPPn>0?(hargaKotor*nettKotorNoAds)/afterPPn:0;
   return {adminPct,feePct,logistik,totalFeeMP,masuk,afterPPn,opex,gp,gm,budgetMktKotor,nettKotor,net,netNoAds,hargaKotor,tier:beratToTier(d.berat)};
 }
 
@@ -1954,50 +1954,130 @@ function logClearRange(){
   document.getElementById('logTo').value='';
   renderLogs();
 }
+// ═══ EXPORT MENGIKUTI HALAMAN AKTIF ═══
 function exportAllData(){
   try{
-    const wb=XLSX.utils.book_new();
-    // Sheet 1: SKU + harga semua platform
-    const plats=['shopee_mall','shopee_star','tiktok_mall','tiktok_powershop'];
-    const platName={shopee_mall:'ShopeeMall',shopee_star:'ShopeeStar',tiktok_mall:'TiktokMall',tiktok_powershop:'TiktokPS'};
-    const skuRows=SKUS.map(s=>{
-      const row={SKU:s.sku,Kategori:s.kat,Tipe:s.tipe,HPP:s.hpp,Berat:s.berat,Zona:s.zone};
-      plats.forEach(pl=>{const p=s.plat[pl]||{};
-        row[platName[pl]+'_Harga']=p.harga||0;
-        row[platName[pl]+'_Min']=p.minbeli||0;
-        row[platName[pl]+'_TargetProfit']=p.tprofit||0;
-        row[platName[pl]+'_Affiliate']=p.afil||0;
-        row[platName[pl]+'_Ads']=p.ads||0;
-        row[platName[pl]+'_HET']=p.het||0;
-      });
-      return row;
-    });
-    XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(skuRows),'SKU & Harga');
-
-    // Sheet 2: Proyeksi & Realisasi (semua bulan)
-    const proyRows=[];
-    Object.entries(PROY).forEach(([month,skus])=>Object.entries(skus).forEach(([sku,d])=>{
-      const row={Bulan:month,SKU:sku,Target:d.target||0};
-      (d.weeks||[]).forEach((w,i)=>row['W'+(i+1)]=w||0);
-      row.Realisasi=(d.weeks||[]).reduce((a,b)=>a+(+b||0),0);
-      row.Fokus=(focusByMonth[month]||[]).includes(sku)?'Ya':'';
-      proyRows.push(row);
-    }));
-    if(proyRows.length)XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(proyRows),'Proyeksi');
-
-    // Sheet 3: Ads / Audit Iklan
-    if(ADS.length){
-      const adsRows=ADS.map(a=>({Listing:a.listing,Platform:a.platform,Spend:a.spend,GMV:a.gmv,ROAS:a.roas}));
-      XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(adsRows),'Audit Iklan');
-    }
-    // Sheet 4: Kamus Listing
-    const mapRows=Object.entries(LISTING_MAP).map(([k,skus])=>({Listing:k,SKU:(skus||[]).join(', ')}));
-    if(mapRows.length)XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(mapRows),'Kamus Listing');
-
     const today=new Date().toISOString().slice(0,10);
-    XLSX.writeFile(wb,`Infarm_Backup_${today}.xlsx`);
-    dbStatus('✓ Data diekspor (backup)','save');
+    const wb=XLSX.utils.book_new();
+    let fname='Infarm_Backup_'+today+'.xlsx';
+    switch(activePage){
+      case 'kalkulator': fname=exportKalkulator(wb,today); break;
+      case 'proyeksi':   fname=exportProyeksi(wb,today); break;
+      case 'adsaudit':   fname=exportAdsAudit(wb,today); break;
+      case 'base':       fname=exportBase(wb,today); break;
+      case 'users':      fname=exportUsers(wb,today); break;
+      case 'riwayat':    fname=exportRiwayat(wb,today); break;
+      default:           fname=exportFullBackup(wb,today); break; // dashboard = backup lengkap
+    }
+    if(!wb.SheetNames.length){alert('Belum ada data untuk diekspor di halaman ini.');return;}
+    XLSX.writeFile(wb,fname);
+    dbStatus('✓ Data diekspor','save');
   }catch(e){console.error(e);alert('Gagal export: '+e.message);}
+}
+const _platName={shopee_mall:'ShopeeMall',shopee_star:'ShopeeStar',tiktok_mall:'TiktokMall',tiktok_powershop:'TiktokPS'};
+
+// KALKULATOR: platform yang sedang dibuka, lengkap dengan kolom terhitung + HET
+function exportKalkulator(wb,today){
+  const pl=currentPlat, tt=PLATFORMS[pl].logistic;
+  const rows=SKUS.map(s=>{
+    const p=s.plat[pl]||{}; const c=calc({...s,...p},pl);
+    const row={SKU:s.sku,Kategori:s.kat,Tipe:s.tipe,HPP:s.hpp,'Harga Jual':p.harga||0,Min:p.minbeli||0};
+    if(tt){row['Berat (g)']=s.berat;row.Tier=beratToTier(s.berat);row.Zona=s.zone;row.Logistik=getLogistik(s.zone,beratToTier(s.berat));}
+    row['GM %']=+(c.gm*100).toFixed(2);
+    row['Target Profit %']=p.tprofit||0;
+    row['Affiliate %']=p.afil||0;
+    row['Ads %']=p.ads||0;
+    row['Target ROAS']=p.ads>0?+(100/p.ads).toFixed(1):'';
+    row['Net Bersih %']=+(c.net*100).toFixed(2);
+    row['Net Tanpa Iklan %']=+(c.netNoAds*100).toFixed(2);
+    row['HET']=p.het||0;
+    return row;
+  });
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows),'Kalkulator '+PLATFORMS[pl].name);
+  return `Infarm_Kalkulator_${_platName[pl]}_${today}.xlsx`;
+}
+// PROYEKSI: bulan yang sedang dipilih
+function exportProyeksi(wb,today){
+  const md=PROY[proyMonth]||{};
+  const rows=[];
+  SKUS.forEach(s=>{const d=md[s.sku];if(!d)return;const c=proyCalc(s.sku);
+    if(!c.target&&!c.real)return;
+    const row={SKU:s.sku,Kategori:s.kat,Target:c.target};
+    c.weeks.forEach((w,i)=>row['W'+(i+1)]=w||0);
+    row.Realisasi=c.real;
+    row['Achievement %']=+(c.ach*100).toFixed(1);
+    row['Proyeksi Akhir']=Math.round(c.forecast);
+    row['Proyeksi %']=+(c.fcAch*100).toFixed(1);
+    row.Fokus=(focusByMonth[proyMonth]||[]).includes(s.sku)?'Ya':'';
+    rows.push(row);
+  });
+  if(rows.length)XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows),'Proyeksi '+proyMonth);
+  return `Infarm_Proyeksi_${proyMonth}_${today}.xlsx`;
+}
+// AUDIT IKLAN: bulan yang dipilih
+function exportAdsAudit(wb,today){
+  const month=document.getElementById('adsMonth').value;
+  const rows=ADS.filter(a=>(a.month||proyMonth)===month).map(a=>{
+    const skus=LISTING_MAP[lkey(a.listing)]||[];
+    const bn=skus.length?blendedNetNoAds(skus,a.platform,month):null;
+    const netNoAds=bn?bn.v:0;
+    const bep=netNoAds>0?1/netNoAds:'';
+    const profit=a.gmv*netNoAds-a.spend;
+    return {Listing:a.listing,Platform:PLATFORMS[a.platform].name,GMV:a.gmv,Spend:a.spend,
+      'Profit Iklan':Math.round(profit),'Blend Net Tanpa Iklan %':+(netNoAds*100).toFixed(1),
+      ROAS:+a.roas.toFixed(1),'BEP ROAS':bep?+bep.toFixed(1):'',SKU:skus.join(', ')};
+  });
+  if(rows.length)XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows),'Audit Iklan '+month);
+  return `Infarm_AuditIklan_${month}_${today}.xlsx`;
+}
+// BASE DATA SKU
+function exportBase(wb,today){
+  const plats=['shopee_mall','shopee_star','tiktok_mall','tiktok_powershop'];
+  const rows=SKUS.map(s=>{
+    const row={SKU:s.sku,Kategori:s.kat,Tipe:s.tipe,HPP:s.hpp,'Berat (g)':s.berat,Tier:beratToTier(s.berat),Zona:s.zone};
+    plats.forEach(pl=>{const p=s.plat[pl]||{};row[_platName[pl]+'_Harga']=p.harga||0;row[_platName[pl]+'_HET']=p.het||0;});
+    return row;
+  });
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows),'Base Data SKU');
+  return `Infarm_BaseData_${today}.xlsx`;
+}
+// KELOLA USER
+function exportUsers(wb,today){
+  const rows=(USERS||[]).map(u=>({Nama:u.nama||'',Email:u.email||'',Role:roleLabel(u.role),Bergabung:u.created_at?new Date(u.created_at).toLocaleDateString('id-ID'):''}));
+  if(rows.length)XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows),'Kelola User');
+  return `Infarm_User_${today}.xlsx`;
+}
+// RIWAYAT
+function exportRiwayat(wb,today){
+  const rows=(LOGS||[]).map(l=>({Waktu:l.waktu?new Date(l.waktu).toLocaleString('id-ID'):'',User:l.user_name||l.user_email||'',Aksi:l.aksi||'',Detail:l.detail||'',Sebelum:l.sebelum||'',Sesudah:l.sesudah||''}));
+  if(rows.length)XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows),'Riwayat');
+  return `Infarm_Riwayat_${today}.xlsx`;
+}
+// BACKUP LENGKAP (dashboard)
+function exportFullBackup(wb,today){
+  const plats=['shopee_mall','shopee_star','tiktok_mall','tiktok_powershop'];
+  const skuRows=SKUS.map(s=>{
+    const row={SKU:s.sku,Kategori:s.kat,Tipe:s.tipe,HPP:s.hpp,Berat:s.berat,Zona:s.zone};
+    plats.forEach(pl=>{const p=s.plat[pl]||{};
+      row[_platName[pl]+'_Harga']=p.harga||0;row[_platName[pl]+'_Min']=p.minbeli||0;
+      row[_platName[pl]+'_TargetProfit']=p.tprofit||0;row[_platName[pl]+'_Affiliate']=p.afil||0;
+      row[_platName[pl]+'_Ads']=p.ads||0;row[_platName[pl]+'_HET']=p.het||0;});
+    return row;
+  });
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(skuRows),'SKU & Harga');
+  const proyRows=[];
+  Object.entries(PROY).forEach(([month,skus])=>Object.entries(skus).forEach(([sku,d])=>{
+    const row={Bulan:month,SKU:sku,Target:d.target||0};
+    (d.weeks||[]).forEach((w,i)=>row['W'+(i+1)]=w||0);
+    row.Realisasi=(d.weeks||[]).reduce((a,b)=>a+(+b||0),0);
+    proyRows.push(row);
+  }));
+  if(proyRows.length)XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(proyRows),'Proyeksi');
+  if(ADS.length){const adsRows=ADS.map(a=>({Bulan:a.month||'',Listing:a.listing,Platform:a.platform,Spend:a.spend,GMV:a.gmv,ROAS:a.roas}));
+    XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(adsRows),'Audit Iklan');}
+  const mapRows=Object.entries(LISTING_MAP).map(([k,skus])=>({Listing:k,SKU:(skus||[]).join(', ')}));
+  if(mapRows.length)XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(mapRows),'Kamus Listing');
+  return `Infarm_Backup_${today}.xlsx`;
 }
 
 // ── EXPORT SEMUA DATA selesai ──
@@ -2616,8 +2696,12 @@ function proyCalc(sku){
   const real=weeks.reduce((a,b)=>a+b,0);
   const target=d.target||0;
   const ach=target>0?real/target:0;
-  const de=daysElapsed(proyMonth), td=daysInMonth(proyMonth);
-  const forecast=de>0?(real/de)*td:0;
+  const td=daysInMonth(proyMonth);
+  // "hari berjalan" berbasis minggu yang SUDAH diisi (posisi minggu terakhir yang ada datanya)
+  // → proyeksi jalan untuk bulan apa pun, dan naik saat lebih banyak minggu diisi
+  let lastWeek=0; for(let i=0;i<nW;i++){ if(weeks[i]>0) lastWeek=i+1; }
+  const de=lastWeek>0?Math.min(lastWeek*7,td):0;   // hari berjalan (dari minggu terisi)
+  const forecast=de>0?(real/de)*td:0;              // pencapaian ÷ hari berjalan × total hari
   const fcAch=target>0?forecast/target:0;
   return {target,weeks,real,ach,forecast,fcAch,nW,de,td};
 }
@@ -3562,7 +3646,9 @@ function closeSidebar(){
   const sb=document.getElementById('sidebar'), ov=document.getElementById('sidebarOverlay');
   if(sb)sb.classList.remove('open'); if(ov)ov.classList.remove('show');
 }
+let activePage='kalkulator';
 function nav(p){
+  activePage=p;
   document.querySelectorAll('.page').forEach(el=>el.classList.remove('active'));
   document.getElementById('page-'+p).classList.add('active');
   document.querySelectorAll('.nav-item').forEach(el=>el.classList.toggle('active',el.dataset.page===p));
