@@ -258,6 +258,19 @@ tr.row-het-bad td{background:rgba(240,97,109,.05)}
 .login-screen{position:fixed;inset:0;z-index:10000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:34px;
   background:radial-gradient(800px circle at 30% 20%,rgba(77,163,255,.12),transparent 60%),radial-gradient(700px circle at 80% 90%,rgba(167,139,250,.10),transparent 55%),var(--bg)}
 .login-quote{text-align:center;max-width:460px;padding:0 24px;animation:quoteFade 1s ease both}
+/* ── BIG GOAL 2027 (dengan efek kilau) ── */
+.goal-2027{text-align:center;animation:quoteFade 1s ease both;margin-bottom:6px}
+.goal-year{line-height:.85}
+.goal-year-text{font-family:'Space Grotesk',sans-serif;font-size:120px;font-weight:700;letter-spacing:-3px;
+  background:linear-gradient(110deg,#3d82d6 0%,#4DA3FF 28%,#f3e4bd 50%,#D9B675 72%,#4DA3FF 100%);
+  background-size:220% 100%;-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent;
+  animation:goalShine 4.5s linear infinite;display:inline-block}
+.goal-sub{font-family:'Space Grotesk',sans-serif;font-size:40px;font-weight:700;color:#E6EDF3;letter-spacing:5px;margin-top:2px;
+  text-shadow:0 2px 30px rgba(77,163,255,.25)}
+.goal-line{width:70px;height:3px;margin:24px auto 0;border-radius:3px;background:linear-gradient(90deg,#4DA3FF,#D9B675)}
+@keyframes goalShine{0%{background-position:120% 0}100%{background-position:-120% 0}}
+.login-quote-text{font-family:'Space Grotesk',sans-serif;font-size:13.5px;font-weight:400;font-style:italic;color:var(--txt-2);line-height:1.6;margin:20px 0 0;padding-top:18px;border-top:1px solid var(--line-soft)}
+@media (max-width:520px){.goal-year-text{font-size:74px}.goal-sub{font-size:26px;letter-spacing:3px}.login-quote-text{font-size:12px}}
 .quote-mark{font-family:'Space Grotesk',sans-serif;font-size:54px;line-height:.5;color:var(--gold);opacity:.55;margin-bottom:10px}
 .quote-text{font-family:'Space Grotesk',sans-serif;font-size:21px;font-weight:500;line-height:1.5;letter-spacing:-.3px;color:var(--txt);margin:0}
 .quote-line{width:54px;height:2px;margin:18px auto 0;border-radius:2px;background:linear-gradient(90deg,var(--blue),var(--gold))}
@@ -459,20 +472,22 @@ tr.row-het-bad td{background:rgba(240,97,109,.05)}
 
 <!-- LOGIN OVERLAY -->
 <div id="loginScreen" class="login-screen">
-  <div class="login-quote">
-    <div class="quote-mark">“</div>
-    <p class="quote-text">Menjadi unit bisnis yang semakin sehat<br>dan berjangka panjang</p>
-    <div class="quote-line"></div>
+  <!-- BIG GOAL 2027 -->
+  <div class="goal-2027">
+    <div class="goal-year"><span class="goal-year-text">2027</span></div>
+    <div class="goal-sub">MALL TANAMAN</div>
+    <div class="goal-line"></div>
   </div>
+  <!-- LOGIN CARD -->
   <div class="login-card">
     <div class="login-brand login-brand-logo">
       <img class="login-logo-img" alt="Infarm Pricing Suite">
     </div>
-    <p class="login-desc">Masuk untuk mengakses dashboard pricing, proyeksi, dan audit iklan.</p>
     <button class="login-btn" onclick="loginGoogle()">
       <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
       Masuk dengan Google
     </button>
+    <p class="login-quote-text">“Menjadi unit bisnis yang semakin sehat<br>dan berjangka panjang”</p>
     <div class="login-note" id="loginNote"></div>
   </div>
 </div>
