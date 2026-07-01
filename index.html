@@ -2550,7 +2550,29 @@ document.addEventListener('click',e=>{
 // ═══════════════════════ PROYEKSI & REALISASI ═══════════════════════
 // Data model: PROY[month][sku] = {target, weeks:[...]}
 const PROY = {};
-let proyMonth = '2025-06';
+const CURRENT_MONTH=(()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');})();
+// deteksi bulan dari NAMA FILE (mis. "proyeksi_juli_2026.xlsx" -> "2026-07")
+function monthFromFilename(name){
+  if(!name)return null;
+  const s=name.toLowerCase().replace(/\.[^.]+$/,'');   // buang ekstensi
+  // 1) format angka: 2026-07, 2026_07, 2026 07, atau 07-2026 / 07_2026
+  let m=s.match(/(20\d{2})[\-_\s\.]?(0[1-9]|1[0-2])(?!\d)/);
+  if(m)return m[1]+'-'+m[2];
+  m=s.match(/(?<!\d)(0[1-9]|1[0-2])[\-_\s\.]?(20\d{2})/);
+  if(m)return m[2]+'-'+m[1];
+  // 2) nama bulan Indonesia + tahun
+  const bulan={januari:'01',jan:'01',februari:'02',feb:'02',maret:'03',mar:'03',april:'04',apr:'04',mei:'05',juni:'06',jun:'06',juli:'07',jul:'07',agustus:'08',agu:'08',ags:'08',agt:'08',september:'09',sep:'09',sept:'09',oktober:'10',okt:'10',oct:'10',november:'11',nov:'11',desember:'12',des:'12',dec:'12'};
+  const yr=s.match(/20\d{2}/);
+  for(const [nama,num] of Object.entries(bulan)){
+    const re=new RegExp('(?:^|[^a-z])'+nama+'(?:[^a-z]|$)');
+    if(re.test(s)){
+      const year=yr?yr[0]:String(new Date().getFullYear());
+      return year+'-'+num;
+    }
+  }
+  return null;
+}
+let proyMonth = CURRENT_MONTH;
 let focusByMonth = {};          // { 'YYYY-MM': ['SKU', ...] }  — tersimpan di DB
 function getFocusList(){ return focusByMonth[proyMonth] || (focusByMonth[proyMonth]=[]); }
 Object.defineProperty(window,'focusSkus',{get(){return getFocusList();},set(v){focusByMonth[proyMonth]=v;}});
@@ -2872,6 +2894,16 @@ function downloadTemplate(kind){
 
 function handleUpload(ev,kind){
   const file=ev.target.files[0]; if(!file)return;
+  // deteksi bulan dari nama file (data proyeksi disimpan per bulan)
+  const detected=monthFromFilename(file.name);
+  if(detected && detected!==proyMonth){
+    const lblD=new Date(detected+'-01').toLocaleDateString('id-ID',{month:'long',year:'numeric'});
+    const lblCur=new Date(proyMonth+'-01').toLocaleDateString('id-ID',{month:'long',year:'numeric'});
+    if(confirm(`Nama file menunjukkan bulan ${lblD}, tapi yang dipilih ${lblCur}.\n\nOK = simpan ke ${lblD} (sesuai nama file)\nCancel = simpan ke ${lblCur} (yang dipilih)`)){
+      proyMonth=detected;
+      const pm=document.getElementById('proyMonth'); if(pm)pm.value=detected;
+    }
+  }
   const mode=confirm('OK = REPLACE (timpa semua)\nCancel = MERGE (gabung/update by SKU)')?'replace':'merge';
   const reader=new FileReader();
   reader.onload=e=>{
@@ -3394,6 +3426,18 @@ function downloadAdsTemplate(){
 function handleAdsUpload(ev){
   const file=ev.target.files[0];if(!file)return;
   const plat=document.getElementById('adsUpPlat').value;
+  // deteksi bulan dari nama file
+  const detected=monthFromFilename(file.name);
+  const am=document.getElementById('adsMonth');
+  if(detected && am){
+    if(detected!==am.value){
+      const lblD=new Date(detected+'-01').toLocaleDateString('id-ID',{month:'long',year:'numeric'});
+      const lblCur=new Date(am.value+'-01').toLocaleDateString('id-ID',{month:'long',year:'numeric'});
+      if(confirm(`Nama file menunjukkan bulan ${lblD}, tapi yang dipilih ${lblCur}.\n\nOK = simpan ke ${lblD} (sesuai nama file)\nCancel = simpan ke ${lblCur} (yang dipilih)`)){
+        am.value=detected;
+      }
+    }
+  }
   const reader=new FileReader();
   reader.onload=e=>{
     try{
@@ -3865,6 +3909,11 @@ function setLogos(){
   document.querySelectorAll('.login-logo-img').forEach(i=>i.src=LOGO_FULL);
   // favicon pakai logo
   try{const fav=document.querySelector("link[rel='icon']");if(fav)fav.href=LOGO_ICON;}catch(e){}
+  // set bulan default = bulan berjalan
+  try{
+    const pm=document.getElementById('proyMonth'); if(pm)pm.value=CURRENT_MONTH;
+    const am=document.getElementById('adsMonth'); if(am)am.value=CURRENT_MONTH;
+  }catch(e){}
 }
 setLogos();
 function hideSplash(){const s=document.getElementById('loadSplash');if(s){setTimeout(()=>s.classList.add('hide'),250);}}
