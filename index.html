@@ -206,6 +206,13 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 .troas-val{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:var(--blue)}
 .het-row-bad{background:rgba(240,97,109,.07)}
 .het-row-bad:hover{background:rgba(240,97,109,.12)}
+/* notice SKU tak dikenal */
+.unknown-notice{display:flex;align-items:center;gap:14px;background:rgba(232,188,99,.08);border:1px solid rgba(232,188,99,.35);border-radius:12px;padding:14px 16px;margin-bottom:16px}
+.unknown-notice .un-ico{font-size:22px;flex-shrink:0}
+.unknown-notice .un-body{flex:1;min-width:0}
+.unknown-notice .un-title{font-size:13px;font-weight:700;color:#E8BC63;margin-bottom:3px}
+.unknown-notice .un-sub{font-size:11px;color:var(--txt-2);line-height:1.5}
+.unknown-notice .un-actions{display:flex;gap:8px;flex-shrink:0}
 .inp-proy{width:64px}
 .sel{border:1px solid rgba(77,163,255,.35);background:var(--bg);border-radius:6px;padding:5px 7px;font-size:10.5px;font-family:'Inter',sans-serif;color:var(--txt);cursor:pointer;max-width:130px}
 .sel:focus{outline:none;border-color:var(--blue)}
@@ -718,6 +725,19 @@ tr.row-het-bad td{background:rgba(240,97,109,.05)}
               </div>
             </div>
           </div>
+        </div>
+      </div>
+
+      <!-- notice SKU tak dikenal (muncul setelah upload jika ada) -->
+      <div id="unknownNotice" class="unknown-notice" style="display:none">
+        <div class="un-ico">⚠️</div>
+        <div class="un-body">
+          <div class="un-title" id="unknownNoticeTitle"></div>
+          <div class="un-sub">SKU ini ada di file-mu tapi tidak cocok dengan master data (kemungkinan SKU baru, typo, atau beda penulisan). Download untuk cek & perbaiki.</div>
+        </div>
+        <div class="un-actions">
+          <button class="tbtn" onclick="downloadUnknownSkus()">⤓ Download Daftar</button>
+          <button class="tbtn" onclick="document.getElementById('unknownNotice').style.display='none'">Tutup</button>
         </div>
       </div>
 
@@ -2027,6 +2047,22 @@ function logClearRange(){
   renderLogs();
 }
 // ═══ EXPORT MENGIKUTI HALAMAN AKTIF ═══
+let lastUnknownSkus=[];
+function downloadUnknownSkus(){
+  if(!lastUnknownSkus.length){alert('Tidak ada daftar SKU tak dikenal.');return;}
+  const today=new Date().toISOString().slice(0,10);
+  const validSku=new Set(SKUS.map(s=>s.sku));
+  // bantu tim: untuk tiap SKU tak dikenal, cari kandidat mirip di master (kemungkinan typo)
+  const norm=s=>String(s).toUpperCase().replace(/[^A-Z0-9]/g,'');
+  const masterNorm={}; SKUS.forEach(s=>{masterNorm[norm(s.sku)]=s.sku;});
+  const rows=lastUnknownSkus.map(sku=>{
+    const kandidat=masterNorm[norm(sku)]||'';   // sama kalau cuma beda tanda/spasi/kapital
+    return {'SKU (di file)':sku,'Kemungkinan maksudnya (master)':kandidat,'Catatan':kandidat?'Beda penulisan — cek/samakan':'Tidak ada yang mirip — mungkin SKU baru'};
+  });
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows),'SKU Tak Dikenal');
+  XLSX.writeFile(wb,`Infarm_SKU_TakDikenal_${today}.xlsx`);
+}
 function exportAllData(){
   try{
     const today=new Date().toISOString().slice(0,10);
@@ -3103,10 +3139,11 @@ function applyUpload(rows,kind,mode){
   }
   let applied=0, unknown=0;
   const validSku=new Set(SKUS.map(s=>s.sku));
+  const unknownList=[];
   for(let i=1;i<rows.length;i++){
     const row=rows[i]; if(!row||!row[skuIdx])continue;
     const sku=String(row[skuIdx]).trim();
-    if(!validSku.has(sku)){unknown++;continue;}
+    if(!validSku.has(sku)){unknown++;if(unknownList.length<5000)unknownList.push(sku);continue;}
     if(!PROY[proyMonth][sku])PROY[proyMonth][sku]={target:0,weeks:[]};
     const d=PROY[proyMonth][sku];
     if(kind==='target'){
@@ -3121,8 +3158,17 @@ function applyUpload(rows,kind,mode){
     }
     applied++;
   }
-  alert(`Upload ${kind} selesai (${mode}).\nDiterapkan: ${applied} SKU${unknown?`\nDilewati (SKU tak dikenal): ${unknown}`:''}`);
+  alert(`Upload ${kind} selesai (${mode}).\nDiterapkan: ${applied} SKU${unknown?`\nDilewati (SKU tak dikenal): ${unknown}\n\nDaftar SKU tak dikenal bisa kamu download di notifikasi kuning.`:''}`);
   closeUploadGuide();
+  // simpan daftar SKU tak dikenal + tampilkan notice
+  lastUnknownSkus=unknownList;
+  const notice=document.getElementById('unknownNotice');
+  if(notice){
+    if(unknown){
+      document.getElementById('unknownNoticeTitle').textContent=`${unknown} SKU tak dikenal — dilewati saat upload`;
+      notice.style.display='flex';
+    } else notice.style.display='none';
+  }
   renderProyeksi();
   // simpan ke DB
   if(supa&&dbReady){(async()=>{
