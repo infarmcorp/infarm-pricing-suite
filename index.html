@@ -545,6 +545,10 @@ tr.row-het-bad td{background:rgba(240,97,109,.05)}
         <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2l3 6 6 .5-4.5 4 1.5 6-6-3.5-6 3.5 1.5-6L3 8.5 9 8z"/><path d="M9 12l2 2 4-4" stroke-width="1.5"/></svg>
         Audit HET
       </div>
+      <div class="nav-item" data-page="tugas" onclick="nav('tugas')">
+        <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>
+        Tugas
+      </div>
       <div class="nav-sec">Data &amp; Tools</div>
       <div class="nav-item active" data-page="kalkulator" onclick="nav('kalkulator')">
         <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="11" x2="8" y2="11"/><line x1="12" y1="11" x2="12" y2="11"/><line x1="16" y1="11" x2="16" y2="11"/><line x1="8" y1="15" x2="8" y2="15"/><line x1="12" y1="15" x2="12" y2="15"/></svg>
@@ -981,6 +985,53 @@ tr.row-het-bad td{background:rgba(240,97,109,.05)}
           </div>
         </div>
         <div class="tbl-scroll" style="max-height:none"><table id="hetTable"></table></div>
+      </div>
+    </div>
+
+    <!-- TUGAS -->
+    <div class="content page" id="page-tugas">
+      <div class="pg-info" style="margin:0 0 12px 2px">Monitoring tugas tim — transparan untuk semua, tercatat deadline dan kapan selesai.</div>
+
+      <div style="display:flex;align-items:center;gap:8px;margin:0 0 12px 2px">
+        <label for="tugasPicFilter" style="font-size:11px;color:var(--txt-3)">Filter PIC:</label>
+        <select class="sel" id="tugasPicFilter" style="max-width:220px" onchange="tugasPicFilterChange(this.value)">
+          <option value="">Semua PIC</option>
+        </select>
+      </div>
+
+      <div class="kpi-row">
+        <div class="kpi a-blue"><div class="kpi-lbl">Total Tugas</div><div class="kpi-val" id="tg-total">0</div><div class="kpi-sub">semua tugas</div></div>
+        <div class="kpi a-green"><div class="kpi-lbl">Tepat Waktu</div><div class="kpi-val" id="tg-ontime">0</div><div class="kpi-sub">selesai ≤ deadline</div></div>
+        <div class="kpi a-red"><div class="kpi-lbl">Terlambat</div><div class="kpi-val" id="tg-late">0</div><div class="kpi-sub">selesai &gt; deadline</div></div>
+        <div class="kpi a-amber"><div class="kpi-lbl">Belum Selesai</div><div class="kpi-val" id="tg-open">0</div><div class="kpi-sub" id="tg-open-s">masih berjalan</div></div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <span class="panel-title">📋 Daftar Tugas</span>
+          <div class="panel-actions">
+            <button class="tbtn" onclick="openTugasForm()">+ Tambah Tugas</button>
+          </div>
+        </div>
+        <div class="tbl-scroll" style="max-height:none"><table id="tugasTable"></table></div>
+      </div>
+    </div>
+
+    <!-- form tambah tugas -->
+    <div class="upload-guide" id="tugasFormGuide" style="display:none">
+      <div class="ug-head"><span class="ug-title">📋 Tambah Tugas</span><span class="ug-close" onclick="closeTugasForm()">✕</span></div>
+      <div class="ug-body">
+        <div class="ug-step" style="border:none">
+          <div class="ug-content" style="display:flex;flex-direction:column;gap:8px">
+            <input class="sel" type="text" id="tgJudul" placeholder="Judul tugas" style="max-width:none;cursor:text">
+            <textarea class="sel" id="tgDeskripsi" placeholder="Deskripsi (opsional)" style="max-width:none;cursor:text;min-height:60px;font-family:inherit"></textarea>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <select class="sel" id="tgPic" style="max-width:220px"><option value="">Pilih PIC…</option></select>
+              <input class="sel" type="date" id="tgDeadline" style="max-width:180px;cursor:text">
+            </div>
+            <div class="ug-btns"><button class="tbtn" onclick="submitTugas()">Simpan Tugas</button></div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -3742,6 +3793,114 @@ function tfHeaderWithKet(id){
   h+='</tr></thead>';
   return h;
 }
+
+// ═══════════════════════ TUGAS ═══════════════════════
+let TASKS=[], PIC_LIST=[], tugasPicFilter='';
+
+async function loadPicList(){
+  if(!supa)return;
+  try{
+    const {data,error}=await supa.from('profiles').select('id,nama,email').order('nama',{ascending:true});
+    if(error)throw error;
+    PIC_LIST=data||[];
+  }catch(e){console.error('Gagal muat daftar PIC',e);}
+}
+async function loadTasks(){
+  if(!supa)return;
+  if(!PIC_LIST.length)await loadPicList();
+  try{
+    const {data,error}=await supa.from('tasks').select('*').order('deadline',{ascending:true});
+    if(error)throw error;
+    TASKS=data||[];
+  }catch(e){dbStatus('⚠️ Gagal memuat tugas','err');}
+  renderTugas();
+}
+function picName(id){const u=PIC_LIST.find(x=>x.id===id);return u?(u.nama||u.email):'–';}
+function tugasStatus(t){
+  if(t.completed_at)return (new Date(t.completed_at)<=new Date(t.deadline+'T23:59:59'))?'ontime':'late';
+  return (new Date(t.deadline+'T23:59:59')<new Date())?'overdue':'open';
+}
+const TUGAS_STATUS_LABEL={ontime:'Tepat waktu',late:'Terlambat',overdue:'Overdue',open:'Berjalan'};
+function tugasPicFilterChange(val){tugasPicFilter=val;renderTugas();}
+function openTugasForm(){document.getElementById('tugasFormGuide').style.display='block';}
+function closeTugasForm(){document.getElementById('tugasFormGuide').style.display='none';}
+function renderTugas(){
+  const el=document.getElementById('tugasTable'); if(!el)return;
+
+  const picSel=document.getElementById('tugasPicFilter');
+  if(picSel){
+    const cur=tugasPicFilter;
+    picSel.innerHTML='<option value="">Semua PIC</option>'+PIC_LIST.map(u=>`<option value="${u.id}">${escAttr(u.nama||u.email)}</option>`).join('');
+    picSel.value=PIC_LIST.some(u=>u.id===cur)?cur:'';
+    tugasPicFilter=picSel.value;
+  }
+  const formSel=document.getElementById('tgPic');
+  if(formSel&&!formSel.dataset.filled){
+    formSel.innerHTML='<option value="">Pilih PIC…</option>'+PIC_LIST.map(u=>`<option value="${u.id}">${escAttr(u.nama||u.email)}</option>`).join('');
+    formSel.dataset.filled='1';
+  }
+
+  const scoped=tugasPicFilter?TASKS.filter(t=>t.pic===tugasPicFilter):TASKS.slice();
+
+  tfRegister('tugas',[
+    {key:'judul',label:'Judul',type:'text',get:t=>t.judul},
+    {key:'pic',label:'PIC',type:'text',get:t=>picName(t.pic)},
+    {key:'deadline',label:'Deadline',type:'text',get:t=>t.deadline},
+    {key:'status',label:'Status',type:'text',status:t=>{const s=tugasStatus(t);return s==='ontime'?'pos':(s==='late'||s==='overdue')?'neg':'warn';},get:t=>TUGAS_STATUS_LABEL[tugasStatus(t)]},
+  ],renderTugas);
+  let rows=tfApply('tugas',scoped);
+
+  let html=tfHeader('tugas').replace('</tr></thead>','<th><div class="th-inner">Selesai</div></th></tr></thead>')+'<tbody>';
+  rows.forEach(t=>{
+    const s=tugasStatus(t);
+    const pillClass=s==='ontime'?'p-pos':(s==='open'?'p-warn':'p-neg');
+    html+=`<tr>
+      <td class="td-sku">${escAttr(t.judul)}${t.deskripsi?`<div class="pg-info" style="margin:2px 0 0">${escAttr(t.deskripsi)}</div>`:''}</td>
+      <td><span class="cat">${escAttr(picName(t.pic))}</span></td>
+      <td>${new Date(t.deadline+'T00:00:00').toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'})}</td>
+      <td><span class="pill ${pillClass}">${TUGAS_STATUS_LABEL[s]}</span></td>
+      <td>${t.completed_at?new Date(t.completed_at).toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'}):`<button class="tbtn" onclick="markTugasDone('${t.id}')">✓ Tandai Selesai</button>`}</td>
+    </tr>`;
+  });
+  if(!rows.length)html+=`<tr><td colspan="5"><div class="empty">${scoped.length?'Tidak ada baris cocok filter.':'Belum ada tugas. Klik "+ Tambah Tugas" untuk mulai.'}</div></td></tr>`;
+  html+='</tbody>';
+  el.innerHTML=html;
+
+  const ontime=scoped.filter(t=>tugasStatus(t)==='ontime').length;
+  const late=scoped.filter(t=>tugasStatus(t)==='late').length;
+  const overdue=scoped.filter(t=>tugasStatus(t)==='overdue').length;
+  const open=scoped.filter(t=>tugasStatus(t)==='open').length;
+  setKPI('tg-total',String(scoped.length));
+  setKPI('tg-ontime',String(ontime));
+  const lateEl=document.getElementById('tg-late'); if(lateEl){lateEl.textContent=late;lateEl.style.color=late?'var(--red)':'';}
+  setKPI('tg-open',String(open+overdue));
+  const openS=document.getElementById('tg-open-s'); if(openS)openS.textContent=overdue?`${overdue} sudah lewat deadline`:'masih berjalan';
+}
+async function submitTugas(){
+  const judul=document.getElementById('tgJudul').value.trim();
+  const deskripsi=document.getElementById('tgDeskripsi').value.trim();
+  const pic=document.getElementById('tgPic').value;
+  const deadline=document.getElementById('tgDeadline').value;
+  if(!judul||!pic||!deadline){alert('Judul, PIC, dan deadline wajib diisi.');return;}
+  try{
+    const {error}=await supa.from('tasks').insert({judul,deskripsi:deskripsi||null,pic,deadline,created_by:currentUser?currentUser.id:null});
+    if(error)throw error;
+    document.getElementById('tgJudul').value='';
+    document.getElementById('tgDeskripsi').value='';
+    document.getElementById('tgPic').value='';
+    document.getElementById('tgDeadline').value='';
+    closeTugasForm();
+    dbStatus('✓ Tugas disimpan','save');
+    loadTasks();
+  }catch(e){alert('Gagal simpan tugas: '+e.message);}
+}
+async function markTugasDone(id){
+  try{
+    const {error}=await supa.from('tasks').update({completed_at:new Date().toISOString()}).eq('id',id);
+    if(error)throw error;
+    loadTasks();
+  }catch(e){alert('Gagal update tugas: '+e.message);}
+}
 function toggleMapPanel(){
   const body=document.getElementById('adsMapBody'), btn=document.getElementById('adsMapToggle');
   const collapsed=body.style.display==='none';
@@ -3945,6 +4104,7 @@ const TITLES={
   audit:['Audit','Omset real vs proyeksi'],
   adsaudit:['Audit Iklan','Cut vs Scale per listing'],
   hetaudit:['Audit HET','Harga jual vs HET per platform'],
+  tugas:['Tugas','Monitoring deadline & PIC'],
   kalkulator:['Kalkulator Harga','Multi-platform per SKU'],
   base:['Base Data SKU','Sumber semua kalkulasi'],
   users:['Kelola User','Atur akses tim'],
@@ -3973,6 +4133,7 @@ function nav(p){
   if(p==='proyeksi'&&typeof setProyMode==='function')setProyMode(proyMode||'unit');
   if(p==='adsaudit')renderAdsAudit();
   if(p==='hetaudit')renderHetAudit();
+  if(p==='tugas')loadTasks();
   if(p==='users')loadUsers();
   if(p==='riwayat')loadLogs();
   if(typeof applyPerms==='function'&&currentUser)applyPerms();
