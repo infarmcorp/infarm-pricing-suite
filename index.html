@@ -915,20 +915,31 @@ tr.row-het-bad td{background:rgba(240,97,109,.05)}
     <div class="content page" id="page-hetaudit">
       <div class="pg-info" style="margin:0 0 12px 2px">Cek harga jual marketplace (setelah diskon) vs HET per platform. Yang di bawah HET jadi alert. Sifatnya sewaktu-waktu — data tidak disimpan.</div>
 
+      <div style="display:flex;align-items:center;gap:8px;margin:0 0 12px 2px">
+        <label for="hetTokoFilter" style="font-size:11px;color:var(--txt-3)">Filter Toko:</label>
+        <select class="sel" id="hetTokoFilter" style="max-width:220px" onchange="hetTokoFilterChange(this.value)">
+          <option value="">Semua Toko</option>
+        </select>
+      </div>
+
       <!-- upload guide -->
       <div class="upload-guide" id="hetUploadGuide" style="display:none">
         <div class="ug-head"><span class="ug-title">📤 Upload Harga Jual Marketplace</span><span class="ug-close" onclick="closeHetUpload()">✕</span></div>
         <div class="ug-body">
           <div class="ug-step" style="border:none;padding-bottom:4px">
             <div class="ug-num" style="background:var(--bg-hover);color:var(--blue)">⚙</div>
-            <div class="ug-content"><div class="ug-step-title">Pilih platform</div>
-              <div class="ug-step-desc">HET dibandingkan sesuai platform yang dipilih.</div>
-              <select class="sel" id="hetUpPlat" style="max-width:240px">
-                <option value="shopee_mall">Shopee Mall</option>
-                <option value="shopee_star">Shopee Star</option>
-                <option value="tiktok_mall">TikTok Mall</option>
-                <option value="tiktok_powershop">TikTok Powershop</option>
-              </select>
+            <div class="ug-content"><div class="ug-step-title">Pilih platform &amp; isi toko</div>
+              <div class="ug-step-desc">HET dibandingkan sesuai platform. Nama toko dipakai untuk filter di halaman ini.</div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap">
+                <select class="sel" id="hetUpPlat" style="max-width:240px">
+                  <option value="shopee_mall">Shopee Mall</option>
+                  <option value="shopee_star">Shopee Star</option>
+                  <option value="tiktok_mall">TikTok Mall</option>
+                  <option value="tiktok_powershop">TikTok Powershop</option>
+                </select>
+                <input class="sel" type="text" id="hetUpToko" list="hetTokoList" placeholder="Nama toko (mis. Toko A)" style="max-width:220px;cursor:text">
+                <datalist id="hetTokoList"></datalist>
+              </div>
             </div>
           </div>
           <div class="ug-step">
@@ -2141,7 +2152,7 @@ function exportAdsAudit(wb,today){
 }
 // AUDIT HET
 function exportHetAudit(wb,today){
-  const rows=HET_AUDIT.map(r=>({SKU:r.sku,Kategori:r.kat,Platform:PLATFORMS[r.platform].name,HET:r.het,'Harga Jual':r.hargaJual,Selisih:r.selisih,Status:r.selisih<0?'Di bawah HET':'Aman'}));
+  const rows=HET_AUDIT.map(r=>({SKU:r.sku,Kategori:r.kat,Toko:r.toko||'',Platform:PLATFORMS[r.platform].name,HET:r.het,'Harga Jual':r.hargaJual,Selisih:r.selisih,Status:r.selisih<0?'Di bawah HET':'Aman',Keterangan:r.ket||''}));
   if(rows.length)XLSX.utils.book_append_sheet(wb,XLSX.utils.json_to_sheet(rows),'Audit HET');
   return `Infarm_AuditHET_${today}.xlsx`;
 }
@@ -3583,7 +3594,9 @@ function renderAdsAudit(){
 function adsSearchFn(v){adsSearch=v;renderAdsAudit();}
 
 // ═══════════════ AUDIT HET (sewaktu-waktu, tanpa simpan) ═══════════════
-let HET_AUDIT=[];   // {sku, kat, platform, het, hargaJual, selisih} — in-memory saja
+let HET_AUDIT=[];   // {sku, kat, platform, toko, het, hargaJual, selisih, ket} — in-memory saja
+let hetTokoFilter='';
+function escAttr(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');}
 function openHetUpload(){document.getElementById('hetUploadGuide').style.display='block';}
 function closeHetUpload(){document.getElementById('hetUploadGuide').style.display='none';}
 function downloadHetTemplate(){
@@ -3599,21 +3612,24 @@ function downloadHetTemplate(){
 function handleHetUpload(ev){
   const file=ev.target.files[0]; if(!file)return;
   const plat=document.getElementById('hetUpPlat').value;
+  const toko=document.getElementById('hetUpToko').value.trim();
+  if(!toko){alert('Isi nama toko dulu sebelum upload.');ev.target.value='';return;}
   const reader=new FileReader();
   reader.onload=e=>{
     try{
       const wb=XLSX.read(e.target.result,{type:'array'});
       const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1});
-      applyHetUpload(rows,plat);
+      applyHetUpload(rows,plat,toko);
     }catch(err){alert('Gagal baca file: '+err.message);}
   };
   reader.readAsArrayBuffer(file);ev.target.value='';
 }
-function applyHetUpload(rows,plat){
+function applyHetUpload(rows,plat,toko){
   if(!rows||rows.length<2){alert('File kosong / format salah.');return;}
   const header=rows[0].map(h=>String(h||'').trim().toUpperCase());
   const iSku=header.indexOf('SKU');
   let iHarga=header.indexOf('HARGA JUAL'); if(iHarga<0)iHarga=header.findIndex(h=>h.includes('HARGA'));
+  const iKet=header.indexOf('KETERANGAN');
   if(iSku<0||iHarga<0){alert('Kolom "SKU" dan "Harga Jual" wajib ada di file.');return;}
   const skuMap={}; SKUS.forEach(s=>skuMap[s.sku]=s);
   let added=0, notFound=[];
@@ -3624,13 +3640,14 @@ function applyHetUpload(rows,plat){
     const s=skuMap[sku];
     if(!s){notFound.push(sku);continue;}
     const hargaJual=parseNum(row[iHarga]); if(isNaN(hargaJual))continue;
+    const ket=iKet>=0&&row[iKet]!=null?String(row[iKet]).trim():'';
     const p=s.plat[plat]||{}; const het=p.het||0;
-    // hapus entri lama SKU+platform ini (kalau upload ulang), lalu tambah
-    HET_AUDIT=HET_AUDIT.filter(x=>!(x.sku===sku&&x.platform===plat));
-    HET_AUDIT.push({sku,kat:s.kat,platform:plat,het,hargaJual,selisih:hargaJual-het});
+    // hapus entri lama SKU+platform+toko ini (kalau upload ulang), lalu tambah
+    HET_AUDIT=HET_AUDIT.filter(x=>!(x.sku===sku&&x.platform===plat&&x.toko===toko));
+    HET_AUDIT.push({sku,kat:s.kat,platform:plat,toko,het,hargaJual,selisih:hargaJual-het,ket});
     added++;
   }
-  let msg=`Audit HET ${PLATFORMS[plat].name}: ${added} SKU dicek.`;
+  let msg=`Audit HET ${PLATFORMS[plat].name} — ${toko}: ${added} SKU dicek.`;
   if(notFound.length)msg+=`\n\n⚠️ ${notFound.length} SKU tidak dikenal (dilewati):\n- `+notFound.slice(0,8).join('\n- ')+(notFound.length>8?`\n…dan ${notFound.length-8} lagi`:'');
   alert(msg);
   closeHetUpload();
@@ -3640,48 +3657,90 @@ function resetHetAudit(){
   if(!HET_AUDIT.length){alert('Belum ada data audit HET.');return;}
   if(!confirm('Kosongkan semua hasil Audit HET?\n\nData ini memang tidak disimpan, jadi aman dikosongkan kapan saja.'))return;
   HET_AUDIT=[];
+  hetTokoFilter='';
   renderHetAudit();
 }
 function renderHetAudit(){
   const el=document.getElementById('hetTable'); if(!el)return;
-  // registrasi filter universal
+
+  // populate dropdown & datalist toko dari data yang ada
+  const tokoList=[...new Set(HET_AUDIT.map(r=>r.toko).filter(Boolean))].sort();
+  const filterSel=document.getElementById('hetTokoFilter');
+  if(filterSel){
+    const cur=hetTokoFilter;
+    filterSel.innerHTML='<option value="">Semua Toko</option>'+tokoList.map(t=>`<option value="${escAttr(t)}">${escAttr(t)}</option>`).join('');
+    filterSel.value=tokoList.includes(cur)?cur:'';
+    hetTokoFilter=filterSel.value;
+  }
+  const dl=document.getElementById('hetTokoList');
+  if(dl)dl.innerHTML=tokoList.map(t=>`<option value="${escAttr(t)}">`).join('');
+
+  // scope by toko yang dipilih -> pengaruh ke KPI juga, bukan cuma tabel
+  const scoped=hetTokoFilter?HET_AUDIT.filter(r=>r.toko===hetTokoFilter):HET_AUDIT.slice();
+
+  // registrasi filter universal (kolom tabel)
   tfRegister('hetaudit',[
     {key:'sku',label:'SKU',type:'text',get:r=>r.sku},
     {key:'kat',label:'Kategori',type:'text',get:r=>r.kat},
+    {key:'toko',label:'Toko',type:'text',get:r=>r.toko},
     {key:'platform',label:'Platform',type:'text',get:r=>PLATFORMS[r.platform].name},
     {key:'het',label:'HET',type:'num',get:r=>r.het},
     {key:'hargaJual',label:'Harga Jual',type:'num',get:r=>r.hargaJual},
     {key:'selisih',label:'Selisih',type:'num',status:r=>r.selisih<0?'neg':r.selisih>0?'pos':'warn',get:r=>r.selisih},
     {key:'status',label:'Status',type:'text',status:r=>r.selisih<0?'neg':'pos',get:r=>r.selisih<0?'Di bawah HET':'Aman'},
   ],renderHetAudit);
-  let rows=tfApply('hetaudit',HET_AUDIT.slice());
+  let rows=tfApply('hetaudit',scoped);
 
-  let html=tfHeader('hetaudit')+'<tbody>';
+  let html=tfHeaderWithKet('hetaudit')+'<tbody>';
   rows.forEach(r=>{
     const below=r.selisih<0;
     const stt=below?'<span class="pill p-neg">⚠️ Di bawah HET</span>':'<span class="pill p-pos">✓ Aman</span>';
     html+=`<tr class="${below?'het-row-bad':''}">
       <td class="td-sku">${r.sku}</td>
       <td><span class="cat">${r.kat}</span></td>
+      <td><span class="cat">${r.toko||'–'}</span></td>
       <td><span class="cat">${PLATFORMS[r.platform].name}</span></td>
       <td class="num">${fmt(r.het)}</td>
       <td class="num" style="font-weight:600">${fmt(r.hargaJual)}</td>
       <td class="num" style="font-weight:600;color:${below?'#F58892':r.selisih>0?'#5FD3A0':'var(--txt-3)'}">${r.selisih>=0?'+':''}${fmt(r.selisih)}</td>
       <td>${stt}</td>
+      <td><input type="text" class="sel" style="width:100%;max-width:none;cursor:text" placeholder="Catatan tim..."
+            data-sku="${escAttr(r.sku)}" data-plat="${r.platform}" data-toko="${escAttr(r.toko)}"
+            value="${escAttr(r.ket||'')}" oninput="hetKetInput(this)"></td>
     </tr>`;
   });
-  if(!rows.length)html+=`<tr><td colspan="7"><div class="empty">${HET_AUDIT.length?'Tidak ada baris cocok filter.':'Belum ada data. Klik "Upload Harga Jual" untuk mulai audit.'}</div></td></tr>`;
+  if(!rows.length)html+=`<tr><td colspan="9"><div class="empty">${scoped.length?'Tidak ada baris cocok filter.':'Belum ada data. Klik "Upload Harga Jual" untuk mulai audit.'}</div></td></tr>`;
   html+='</tbody>';
   el.innerHTML=html;
 
-  // KPI
-  const below=HET_AUDIT.filter(x=>x.selisih<0);
+  // KPI (dihitung dari scope toko yang dipilih)
+  const below=scoped.filter(x=>x.selisih<0);
   const totGap=below.reduce((a,x)=>a+x.selisih,0);
-  setKPI('het-total',String(HET_AUDIT.length));
+  setKPI('het-total',String(scoped.length));
   const belowEl=document.getElementById('het-below'); if(belowEl){belowEl.textContent=below.length;belowEl.style.color=below.length?'var(--red)':'';}
-  setKPI('het-safe',String(HET_AUDIT.length-below.length));
+  setKPI('het-safe',String(scoped.length-below.length));
   setKPI('het-gap',fmt(totGap));
-  const note=document.getElementById('hetSummaryNote'); if(note)note.textContent=HET_AUDIT.length?`${HET_AUDIT.length} SKU dicek`:'';
+  const note=document.getElementById('hetSummaryNote'); if(note)note.textContent=scoped.length?`${scoped.length} SKU dicek${hetTokoFilter?' — '+hetTokoFilter:''}`:'';
+}
+function hetTokoFilterChange(val){hetTokoFilter=val;renderHetAudit();}
+function hetKetInput(el){
+  const r=HET_AUDIT.find(x=>x.sku===el.dataset.sku&&x.platform===el.dataset.plat&&x.toko===el.dataset.toko);
+  if(r)r.ket=el.value;
+}
+function tfHeaderWithKet(id){
+  // sama seperti tfHeader tapi menambahkan kolom Keterangan (non-filterable, editable) di akhir
+  const d=TFDEF[id],st=TF[id];
+  let h='<thead><tr>';
+  d.cols.forEach(c=>{
+    const active=(st.sort.col===c.key)||(st.filt[c.key]&&((st.filt[c.key].status&&st.filt[c.key].status.size)||st.filt[c.key].text));
+    h+=`<th><div class="th-inner ${c.type==='num'?'r':''}">${c.label}
+      <button class="fbtn${active?' on':''}" onclick="tfOpen(event,'${id}','${c.key}')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 4h18l-7 8v6l-4 2v-8z"/></svg>
+      </button></div></th>`;
+  });
+  h+='<th><div class="th-inner">Keterangan</div></th>';
+  h+='</tr></thead>';
+  return h;
 }
 function toggleMapPanel(){
   const body=document.getElementById('adsMapBody'), btn=document.getElementById('adsMapToggle');
