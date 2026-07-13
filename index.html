@@ -3850,7 +3850,7 @@ function renderTugas(){
   ],renderTugas);
   let rows=tfApply('tugas',scoped);
 
-  let html=tfHeader('tugas').replace('</tr></thead>','<th><div class="th-inner">Selesai</div></th></tr></thead>')+'<tbody>';
+  let html=tfHeader('tugas').replace('</tr></thead>','<th><div class="th-inner">Selesai</div></th><th><div class="th-inner">Aksi</div></th></tr></thead>')+'<tbody>';
   rows.forEach(t=>{
     const s=tugasStatus(t);
     const pillClass=s==='ontime'?'p-pos':(s==='open'?'p-warn':'p-neg');
@@ -3860,9 +3860,10 @@ function renderTugas(){
       <td>${new Date(t.deadline+'T00:00:00').toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'})}</td>
       <td><span class="pill ${pillClass}">${TUGAS_STATUS_LABEL[s]}</span></td>
       <td>${t.completed_at?new Date(t.completed_at).toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'}):`<button class="tbtn" onclick="markTugasDone('${t.id}')">✓ Tandai Selesai</button>`}</td>
+      <td><button class="tbtn danger-outline" title="Hapus tugas" onclick="deleteTugas('${t.id}')">🗑</button></td>
     </tr>`;
   });
-  if(!rows.length)html+=`<tr><td colspan="5"><div class="empty">${scoped.length?'Tidak ada baris cocok filter.':'Belum ada tugas. Klik "+ Tambah Tugas" untuk mulai.'}</div></td></tr>`;
+  if(!rows.length)html+=`<tr><td colspan="6"><div class="empty">${scoped.length?'Tidak ada baris cocok filter.':'Belum ada tugas. Klik "+ Tambah Tugas" untuk mulai.'}</div></td></tr>`;
   html+='</tbody>';
   el.innerHTML=html;
 
@@ -3900,6 +3901,20 @@ async function markTugasDone(id){
     if(error)throw error;
     loadTasks();
   }catch(e){alert('Gagal update tugas: '+e.message);}
+}
+async function deleteTugas(id){
+  const t=TASKS.find(x=>x.id===id);
+  if(!confirm(`Hapus tugas "${t?t.judul:''}"? Tindakan ini tidak bisa dibatalkan.`))return;
+  try{
+    const {data,error}=await supa.from('tasks').delete().eq('id',id).select();
+    if(error)throw error;
+    if(!data||!data.length){
+      alert('Tugas tidak terhapus — kemungkinan kamu bukan pembuat tugas ini dan bukan admin.');
+      return;
+    }
+    dbStatus('✓ Tugas dihapus','save');
+    loadTasks();
+  }catch(e){alert('Gagal hapus tugas: '+e.message);}
 }
 function toggleMapPanel(){
   const body=document.getElementById('adsMapBody'), btn=document.getElementById('adsMapToggle');
