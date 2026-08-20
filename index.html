@@ -676,6 +676,7 @@ tr.row-het-bad td{background:rgba(240,97,109,.05)}
           <div class="leg"><div class="leg-d" style="background:var(--bg-hover)"></div> Otomatis</div>
           <div class="leg" id="logiLeg"></div>
           <div class="leg"><div class="leg-d" style="background:var(--green-bg)"></div> Net Tanpa Iklan = net jika ads 0</div>
+          <div class="leg"><div class="leg-d" style="background:var(--green-bg)"></div> Net Bersih (HET) = net kalau harga jual = HET</div>
           <div class="leg"><div class="leg-d" style="background:var(--red-strong);border:1px solid var(--red)"></div> HET ≥ Harga jual</div>
         </div>
       </div>
@@ -2216,6 +2217,7 @@ function exportKalkulator(wb,today){
     row['Net Bersih %']=+(c.net*100).toFixed(2);
     row['Net Tanpa Iklan %']=+(c.netNoAds*100).toFixed(2);
     row['HET']=p.het||0;
+    row['Net Bersih (HET) %']=+(calc({...s,...p,harga:p.het||0},pl).net*100).toFixed(2);
     return row;
   });
   const label=store?store.shopCode:pl;
@@ -2318,6 +2320,7 @@ function colStatus(col,d,c){
     case 'gm': return c.gm>0.05?'pos':c.gm>0?'warn':'neg';
     case 'net': return statusOf(c.net);
     case 'netNoAds': return statusOf(c.netNoAds);
+    case 'netHet': return statusOf(calc({...d,...d.p,harga:d.p.het},currentPlat).net);
     case 'het': { const het=d.p.het, harga=d.p.harga; if(het>=harga&&harga>0)return 'neg'; return het>0?'pos':'warn'; }
     default: {
       const v=col.get(d);
@@ -2455,6 +2458,7 @@ function calcColumns(){
   cols.push({key:'net', label:'Net Bersih', type:'num', status:true, get:d=>calc({...d,...d.p},currentPlat).net});
   cols.push({key:'netNoAds', label:'Net Tanpa Iklan', type:'num', status:true, get:d=>calc({...d,...d.p},currentPlat).netNoAds});
   cols.push({key:'het', label:'HET', type:'num', status:true, get:d=>d.p.het});
+  cols.push({key:'netHet', label:'Net Bersih (HET)', type:'num', status:true, get:d=>calc({...d,...d.p,harga:d.p.het},currentPlat).net});
   return cols;
 }
 
@@ -2595,8 +2599,10 @@ function renderKalkulator(){
   rows.forEach(d=>{
     const s=d, p=d.p, i=d.idx;
     const c=calc({...s,...p},currentPlat);
+    const cHet=calc({...s,...p,harga:p.het},currentPlat);
     const gmC=c.gm>0.05?'p-pos':c.gm>0?'p-warn':'p-neg';
     const netC=c.net>0.0001?'p-pos':c.net<-0.0001?'p-neg':'p-warn';
+    const netHetC=cHet.net>0.0001?'p-pos':cHet.net<-0.0001?'p-neg':'p-warn';
     const hetBad=p.het>=p.harga;
     html+=`<tr class="${hetBad?'row-het-bad':''}">
       <td class="td-sku">${s.sku}</td>
@@ -2619,6 +2625,7 @@ function renderKalkulator(){
       <td class="num"><span class="pill ${netC}">${pct(c.net)}</span></td>
       <td class="num"><span class="pill ${c.netNoAds>0.0001?'p-pos':c.netNoAds<-0.0001?'p-neg':'p-warn'}">${pct(c.netNoAds)}</span></td>
       <td class="num"><input class="inp editable ${hetBad?'het-bad':''}" data-col="het" type="number" value="${p.het}" onchange="upd(${i},'het',this.value)" title="${hetBad?'HET ≥ harga jual!':''}"></td>
+      <td class="num"><span class="pill ${netHetC}" title="Net Bersih kalau harga jual = HET">${pct(cHet.net)}</span></td>
       <td><button class="del-btn" data-col="del" onclick="delSku(${i})" title="Hapus SKU">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
       </button></td>
