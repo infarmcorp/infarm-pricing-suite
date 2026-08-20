@@ -3825,20 +3825,23 @@ function resetHetAudit(){
 function renderHetAudit(){
   const el=document.getElementById('hetTable'); if(!el)return;
 
-  // populate dropdown & datalist toko dari data yang ada
-  const tokoList=[...new Set(HET_AUDIT.map(r=>r.toko).filter(Boolean))].sort();
+  // populate dropdown Filter Toko dari daftar toko RESMI (STORES) — sama seperti di Kalkulator Harga,
+  // bukan dari data audit yang sudah ada. Jadi tetap lengkap walau belum ada upload sama sekali.
   const filterSel=document.getElementById('hetTokoFilter');
   if(filterSel){
     const cur=hetTokoFilter;
-    filterSel.innerHTML='<option value="">Semua Toko</option>'+tokoList.map(t=>`<option value="${escAttr(t)}">${escAttr(t)}</option>`).join('');
-    filterSel.value=tokoList.includes(cur)?cur:'';
+    let optsHtml='<option value="">Semua Toko</option>';
+    Object.entries(PLATFORMS).forEach(([platKey,P])=>{
+      const ids=storeIdsForPlatform(platKey); if(!ids.length)return;
+      optsHtml+=`<optgroup label="${P.name}">`+ids.map(id=>`<option value="${id}">${STORES[id].name} (${STORES[id].shopCode})</option>`).join('')+'</optgroup>';
+    });
+    filterSel.innerHTML=optsHtml;
+    filterSel.value=STORES[cur]?cur:'';
     hetTokoFilter=filterSel.value;
   }
-  const dl=document.getElementById('hetTokoList');
-  if(dl)dl.innerHTML=tokoList.map(t=>`<option value="${escAttr(t)}">`).join('');
 
-  // scope by toko yang dipilih -> pengaruh ke KPI juga, bukan cuma tabel
-  const scoped=hetTokoFilter?HET_AUDIT.filter(r=>r.toko===hetTokoFilter):HET_AUDIT.slice();
+  // scope by toko (storeId) yang dipilih -> pengaruh ke KPI juga, bukan cuma tabel
+  const scoped=hetTokoFilter?HET_AUDIT.filter(r=>r.storeId===hetTokoFilter):HET_AUDIT.slice();
 
   // registrasi filter universal (kolom tabel)
   tfRegister('hetaudit',[
@@ -3882,7 +3885,7 @@ function renderHetAudit(){
   const belowEl=document.getElementById('het-below'); if(belowEl){belowEl.textContent=below.length;belowEl.style.color=below.length?'var(--red)':'';}
   setKPI('het-safe',String(scoped.length-below.length));
   setKPI('het-gap',fmt(totGap));
-  const note=document.getElementById('hetSummaryNote'); if(note)note.textContent=scoped.length?`${scoped.length} SKU dicek${hetTokoFilter?' — '+hetTokoFilter:''}`:'';
+  const note=document.getElementById('hetSummaryNote'); if(note)note.textContent=scoped.length?`${scoped.length} SKU dicek${hetTokoFilter&&STORES[hetTokoFilter]?' — '+STORES[hetTokoFilter].name:''}`:'';
 }
 function hetTokoFilterChange(val){hetTokoFilter=val;renderHetAudit();}
 function hetKetInput(el){
