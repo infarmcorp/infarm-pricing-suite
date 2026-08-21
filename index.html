@@ -653,6 +653,26 @@ tr.row-het-bad td{background:rgba(240,97,109,.05)}
           </div>
         </div>
       </div>
+
+      <!-- bulk delete guide -->
+      <div class="upload-guide" id="bulkDeleteGuide" style="display:none;border-color:var(--red)">
+        <div class="ug-head">
+          <span class="ug-title">🗑 Hapus SKU Terpilih</span>
+          <span class="ug-close" onclick="closeBulkDeleteModal()">✕</span>
+        </div>
+        <div class="ug-body">
+          <div class="ug-step" style="border:none">
+            <div class="ug-content">
+              <div class="ug-step-title" id="bulkDelDesc">0 SKU dipilih</div>
+              <div class="ug-step-desc">Pilih cakupan penghapusan. Tindakan ini bisa dibatalkan lewat Undo (Ctrl+Z) selama belum ganti halaman/reload.</div>
+              <div class="ug-btns" style="flex-direction:column;align-items:stretch;gap:8px;margin-top:10px">
+                <button class="tbtn" onclick="bulkDeleteExecute('store')">Hapus dari toko ini saja <span style="color:var(--txt-3);font-weight:400">(tetap ada di toko lain &amp; master)</span></button>
+                <button class="tbtn" style="color:var(--red);border-color:var(--red)" onclick="bulkDeleteExecute('master')">Hapus dari Master <span style="font-weight:400">(hilang dari SEMUA toko)</span></button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
       <div class="kpi-row" id="calcSummary"></div>
       <div class="panel">
         <div class="panel-head">
@@ -664,6 +684,7 @@ tr.row-het-bad td{background:rgba(240,97,109,.05)}
             <button class="tbtn undo-btn" onclick="doUndo()" disabled title="Undo (Ctrl+Z)">↩ Undo</button>
             <button class="tbtn" onclick="addSku()">+ SKU</button>
             <button class="tbtn" onclick="openCalcUpload()">↑ Upload Massal</button>
+            <button class="tbtn" id="bulkDelBtn" style="display:none;color:var(--red);border-color:var(--red)" onclick="openBulkDeleteModal()">🗑 Hapus Terpilih (<span id="bulkDelCount">0</span>)</button>
             <button class="tbtn clear" id="clearFilters" style="display:none" onclick="clearAllFilters()">Reset filter</button>
           </div>
         </div>
@@ -2432,6 +2453,49 @@ function tfReopen(id,key){
 let sortState={col:null,dir:null};   // dir: 'asc'|'desc'
 let filters={};                       // col -> {status:Set, text:string}
 let curPage=1; const PAGE_SIZE=50;
+let selectedSkus=new Set();      // SKU (string) yang dicentang untuk hapus massal — scoped ke toko yang lagi dibuka
+let currentAllRowSkus=[];        // seluruh SKU yang match filter di toko ini (semua halaman), buat "select all"
+function clearSkuSelection(){selectedSkus.clear();}
+function toggleSelectAllCalc(el){
+  if(el.checked) currentAllRowSkus.forEach(sku=>selectedSkus.add(sku));
+  else currentAllRowSkus.forEach(sku=>selectedSkus.delete(sku));
+  renderKalkulator();
+}
+function toggleSelectSku(el){
+  const sku=el.dataset.sku;
+  if(el.checked) selectedSkus.add(sku); else selectedSkus.delete(sku);
+  renderKalkulator();
+}
+function openBulkDeleteModal(){
+  if(!selectedSkus.size){alert('Belum ada SKU yang dicentang.');return;}
+  document.getElementById('bulkDelDesc').textContent=`${selectedSkus.size} SKU dipilih`;
+  document.getElementById('bulkDeleteGuide').style.display='block';
+}
+function closeBulkDeleteModal(){document.getElementById('bulkDeleteGuide').style.display='none';}
+function bulkDeleteExecute(scope){
+  const skus=[...selectedSkus]; if(!skus.length)return;
+  const storeLabel=STORES[currentStore]?STORES[currentStore].name+' ('+STORES[currentStore].shopCode+')':currentPlat;
+  const confirmMsg=scope==='master'
+    ? `Hapus ${skus.length} SKU terpilih dari MASTER?\nSKU ini akan hilang dari SEMUA toko, bukan cuma ${storeLabel}.`
+    : `Hapus ${skus.length} SKU terpilih dari toko "${storeLabel}" saja?\nSKU tetap ada di master & toko lain.`;
+  if(!confirm(confirmMsg))return;
+  snapshot(`hapus massal ${skus.length} SKU (${scope==='master'?'master':storeLabel})`);
+  if(scope==='master'){
+    skus.forEach(sku=>deleteSkuDB(sku));
+    for(let i=SKUS.length-1;i>=0;i--){ if(selectedSkus.has(SKUS[i].sku)) SKUS.splice(i,1); }
+    logChange('Hapus Massal SKU (Master)', skus.length+' SKU','ada','dihapus dari semua toko');
+  } else {
+    skus.forEach(sku=>{
+      const s=SKUS.find(x=>x.sku===sku);
+      if(s&&s.plat[currentStore]){ delete s.plat[currentStore]; saveSku(sku); }
+    });
+    logChange('Hapus Massal SKU (per toko)', skus.length+' SKU dari '+storeLabel,'ada','dihapus dari toko ini');
+  }
+  selectedSkus.clear();
+  closeBulkDeleteModal();
+  renderKalkulator();renderProyeksi();renderAudit();renderDashboard();renderBase();
+  dbStatus(`✓ ${skus.length} SKU dihapus`,'save');
+}
 
 // column definitions for kalkulator
 function calcColumns(){
@@ -2471,6 +2535,7 @@ function renderPlatTabs(){
     el.onclick=()=>{
       currentPlat=k;
       if(!STORES[currentStore]||STORES[currentStore].platform!==k) currentStore=defaultStoreForPlatform(k);
+      clearSkuSelection();
       sortState={col:null,dir:null};filters={};curPage=1;renderKalkulator();
     };
     el.innerHTML=`<span class="dot" style="background:${P.color};color:${P.color}"></span>${P.name}`;
@@ -2491,6 +2556,7 @@ function renderStoreTabs(){
 function switchStore(id){
   if(!STORES[id])return;
   currentStore=id;
+  clearSkuSelection();
   sortState={col:null,dir:null};filters={};curPage=1;
   renderKalkulator();
 }
@@ -2570,6 +2636,11 @@ function renderKalkulator(){
 
   const cols=calcColumns();
   const allRows=getRows();
+  currentAllRowSkus=allRows.map(r=>r.sku);
+  // buang sku terpilih yang sudah tidak ada di list toko ini (mis. setelah upload/hapus)
+  selectedSkus.forEach(sku=>{ if(!currentAllRowSkus.includes(sku)) selectedSkus.delete(sku); });
+  const bulkBtn=document.getElementById('bulkDelBtn');
+  if(bulkBtn){ bulkBtn.style.display=selectedSkus.size?'inline-flex':'none'; document.getElementById('bulkDelCount').textContent=selectedSkus.size; }
   const tt=P.logistic;
   // pagination
   const totalPages=Math.max(1,Math.ceil(allRows.length/PAGE_SIZE));
@@ -2579,6 +2650,8 @@ function renderKalkulator(){
 
   // header
   let html='<thead><tr>';
+  const allSelected=currentAllRowSkus.length>0&&currentAllRowSkus.every(sku=>selectedSkus.has(sku));
+  html+=`<th style="width:36px"><input type="checkbox" id="calcSelectAll" ${allSelected?'checked':''} onclick="toggleSelectAllCalc(this)" title="Pilih semua SKU di toko ini (semua halaman)"></th>`;
   cols.forEach(c=>{
     const sortable=true;
     const active=sortState.col===c.key;
@@ -2594,7 +2667,7 @@ function renderKalkulator(){
   html+='<th><div class="th-inner r"></div></th>';
   html+='</tr></thead><tbody>';
 
-  if(!rows.length){ html+=`<tr><td colspan="${cols.length+1}"><div class="empty">Tidak ada SKU yang cocok dengan filter.</div></td></tr>`; }
+  if(!rows.length){ html+=`<tr><td colspan="${cols.length+2}"><div class="empty">Tidak ada SKU yang cocok dengan filter.</div></td></tr>`; }
 
   rows.forEach(d=>{
     const s=d, p=d.p, i=d.idx;
@@ -2605,6 +2678,7 @@ function renderKalkulator(){
     const netHetC=cHet.net>0.0001?'p-pos':cHet.net<-0.0001?'p-neg':'p-warn';
     const hetBad=p.het>=p.harga;
     html+=`<tr class="${hetBad?'row-het-bad':''}">
+      <td><input type="checkbox" class="calc-row-chk" data-sku="${escAttr(s.sku)}" ${selectedSkus.has(s.sku)?'checked':''} onclick="toggleSelectSku(this)"></td>
       <td class="td-sku">${s.sku}</td>
       <td><span class="cat">${s.kat}</span></td>
       <td><span class="tipe ${tipeC(s.tipe)}">${s.tipe}</span></td>
