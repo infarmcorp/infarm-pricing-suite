@@ -3108,8 +3108,8 @@ function proyCalc(sku){
   const fcAch=target>0?forecast/target:0;
   return {target,weeks,real,ach,forecast,fcAch,nW,de,td};
 }
-const stPill=a=>a>=1?'p-pos':a>=0.8?'p-warn':'p-neg';
-const stLabel=a=>a>=1?'✅ Tercapai':a>=0.8?'⚠️ Hampir':'❌ Tidak';
+const stPill=a=>a>=1?'p-pos':'p-neg';
+const stLabel=a=>a>=1?'✅ Tercapai':'❌ Tidak Tercapai';
 
 function setProyMonth(v){proyMonth=v;proyPage=1;const ps=document.getElementById('psub');if(ps)ps.textContent='Target per SKU — '+monthLabel(v);renderProyeksi();}
 function openUploadGuide(){document.getElementById('uploadGuide').style.display='block';}
