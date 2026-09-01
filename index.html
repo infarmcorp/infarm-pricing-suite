@@ -817,12 +817,15 @@ tr.row-het-bad td{background:rgba(240,97,109,.05)}
           <span class="panel-title">Semua SKU — Target &amp; Realisasi</span>
           <div class="panel-actions">
             <button class="tbtn undo-btn" onclick="doUndo()" disabled title="Undo (Ctrl+Z)">↩ Undo</button>
-            <span class="pg-info">Klik ikon filter di tiap kolom · urutan berubah saat "Terapkan", tidak loncat saat input</span>
+            <span class="pg-info" id="proyTableHint">Klik ikon filter di tiap kolom · urutan berubah saat "Terapkan", tidak loncat saat input</span>
             <button class="tbtn clear" onclick="clearProyFilter()">↺ Reset filter</button>
+            <button class="tbtn" id="proyTableToggleBtn" onclick="toggleProyTable()">▾ Sembunyikan</button>
           </div>
         </div>
-        <div class="tbl-scroll"><table id="proyTable"></table></div>
-        <div class="pager" id="proyPager" style="display:none"></div>
+        <div id="proyTableBody">
+          <div class="tbl-scroll"><table id="proyTable"></table></div>
+          <div class="pager" id="proyPager" style="display:none"></div>
+        </div>
       </div>
       </div><!-- /proyUnitView -->
 
@@ -3351,6 +3354,16 @@ function updWeek(sku,w,v){const d=getProy(sku);if(!d.weeks)d.weeks=[];const old=
 
 // ── search filter for main proy table ──
 function clearProyFilter(){proySearch='';proyPage=1;if(TF.proy){TF.proy.sort={col:null,dir:null};TF.proy.filt={};}preserveProyOrder=false;closeFilter();renderProyTable();}
+function toggleProyTable(){
+  const body=document.getElementById('proyTableBody');
+  const btn=document.getElementById('proyTableToggleBtn');
+  const hint=document.getElementById('proyTableHint');
+  if(!body||!btn)return;
+  const hidden=body.style.display==='none';
+  body.style.display=hidden?'':'none';
+  btn.textContent=hidden?'▾ Sembunyikan':'▸ Tampilkan';
+  if(hint)hint.style.display=hidden?'':'none';
+}
 function proySearchFn(v){proySearch=v;proyPage=1;if(proyMode==='rupiah')renderAudit();}
 
 // ═══════════════════════ UPLOAD / TEMPLATE (xlsx) ═══════════════════════
