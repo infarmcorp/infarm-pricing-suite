@@ -144,6 +144,12 @@ body::after{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;opac
 .kpi:hover{transform:translateY(-3px);border-color:color-mix(in srgb,var(--accent,var(--blue)) 42%,var(--line));box-shadow:var(--shadow-lg),inset 0 1px 0 rgba(255,255,255,.06)}
 .kpi:hover::before{opacity:.13}
 .kpi-lbl{font-size:9.5px;color:var(--txt-3);text-transform:uppercase;letter-spacing:.8px;margin-bottom:8px;font-weight:600;position:relative}
+.kpi.kpi-sm{padding:10px 12px}
+.kpi.kpi-sm .kpi-lbl{font-size:8.5px;margin-bottom:4px;letter-spacing:.5px}
+.kpi.kpi-sm .kpi-val{font-size:16px}
+.kpi.kpi-sm .kpi-sub{font-size:9px;margin-top:3px}
+.proy-split-grid{display:grid;grid-template-columns:1fr 1.35fr;gap:16px;align-items:start;margin-bottom:16px}
+@media (max-width:1100px){.proy-split-grid{grid-template-columns:1fr}}
 .kpi-val{font-size:23px;font-weight:700;font-family:'Space Grotesk',sans-serif;line-height:1;letter-spacing:-.6px;position:relative}
 .kpi-sub{font-size:10px;margin-top:6px;color:var(--txt-3);position:relative}
 .kpi.a-blue{--accent:var(--blue)}.kpi.a-green{--accent:var(--green)}
@@ -769,37 +775,56 @@ tr.row-het-bad td{background:rgba(240,97,109,.05)}
         </div>
       </div>
 
-      <div class="kpi-row">
-        <div class="kpi a-amber"><div class="kpi-lbl">Total Target</div><div class="kpi-val" id="pr-pcs">–</div><div class="kpi-sub">unit bulan ini</div></div>
-        <div class="kpi a-blue"><div class="kpi-lbl">Total Realisasi</div><div class="kpi-val" id="pr-real">–</div><div class="kpi-sub" id="pr-real-s">unit terjual</div></div>
-        <div class="kpi a-green"><div class="kpi-lbl">Achievement</div><div class="kpi-val" id="pr-ach">–</div><div class="kpi-sub">real vs target</div></div>
-        <div class="kpi a-blue"><div class="kpi-lbl">Proyeksi Akhir Bulan</div><div class="kpi-val" id="pr-fc">–</div><div class="kpi-sub" id="pr-fc-s">run-rate harian</div></div>
+      <div class="proy-split-grid">
+        <!-- kolom kiri: KPI keseluruhan (dipadatkan) -->
+        <div class="proy-col-left">
+          <div class="kpi-row kpi-row-2col" style="grid-template-columns:repeat(2,1fr);margin-bottom:10px">
+            <div class="kpi kpi-sm a-amber"><div class="kpi-lbl">Total Target</div><div class="kpi-val" id="pr-pcs">–</div><div class="kpi-sub">unit bulan ini</div></div>
+            <div class="kpi kpi-sm a-blue"><div class="kpi-lbl">Total Realisasi</div><div class="kpi-val" id="pr-real">–</div><div class="kpi-sub" id="pr-real-s">unit terjual</div></div>
+            <div class="kpi kpi-sm a-green"><div class="kpi-lbl">Achievement</div><div class="kpi-val" id="pr-ach">–</div><div class="kpi-sub">real vs target</div></div>
+            <div class="kpi kpi-sm a-blue"><div class="kpi-lbl">Proyeksi Akhir Bulan</div><div class="kpi-val" id="pr-fc">–</div><div class="kpi-sub" id="pr-fc-s">run-rate harian</div></div>
+          </div>
+
+          <!-- ===== UNIT VIEW (Input) — bagian kiri: Omset & Profit ===== -->
+          <div id="proyUnitViewLeft">
+            <div class="kpi-row" style="grid-template-columns:1fr 1fr">
+              <div class="kpi kpi-sm a-green"><div class="kpi-lbl">Proyeksi Omset Bersih</div><div class="kpi-val" id="pr-omset">–</div><div class="kpi-sub">target × Shopee Mall (after PPN)</div></div>
+              <div class="kpi kpi-sm a-amber"><div class="kpi-lbl">Proyeksi Profit</div><div class="kpi-val" id="pr-profit">–</div><div class="kpi-sub" id="pr-profit-s">omset × rata-rata target profit</div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- kolom kanan: khusus SKU Fokus (KPI mini + 2 grafik) -->
+        <div class="proy-col-right" id="proyUnitViewRight">
+          <div class="dcard" style="margin-bottom:13px">
+            <div class="dcard-h">⭐ KPI SKU Fokus <span class="dcard-sub" id="focusKpiNote"></span></div>
+            <div class="dcard-b" style="padding:12px 14px">
+              <div class="kpi-row" style="grid-template-columns:repeat(3,1fr)">
+                <div class="kpi kpi-sm a-amber"><div class="kpi-lbl">Target Fokus</div><div class="kpi-val" id="fk-target">–</div><div class="kpi-sub">unit bulan ini</div></div>
+                <div class="kpi kpi-sm a-blue"><div class="kpi-lbl">Realisasi Fokus</div><div class="kpi-val" id="fk-real">–</div><div class="kpi-sub">unit terjual</div></div>
+                <div class="kpi kpi-sm a-green"><div class="kpi-lbl">Achievement Fokus</div><div class="kpi-val" id="fk-ach">–</div><div class="kpi-sub">real vs target fokus</div></div>
+              </div>
+            </div>
+          </div>
+          <div class="dcard" style="margin-bottom:13px">
+            <div class="dcard-h">📈 Tren Realisasi Mingguan <span class="dcard-sub" id="trendNote"></span></div>
+            <div class="dcard-b" style="padding:14px 16px"><div id="trendChart"></div></div>
+          </div>
+          <div class="dcard">
+            <div class="dcard-h">🥧 Realisasi per Kategori <span class="dcard-sub" id="catPieNote"></span></div>
+            <div class="dcard-b" style="padding:14px 16px"><div id="catPie"></div></div>
+          </div>
+        </div>
       </div>
 
-      <!-- ===== UNIT VIEW (Input) ===== -->
+      <!-- ===== UNIT VIEW (Input) — sisanya (tabel fokus & tabel semua SKU) ===== -->
       <div id="proyUnitView">
-      <div class="kpi-row" style="grid-template-columns:1fr 1fr">
-        <div class="kpi a-green"><div class="kpi-lbl">Proyeksi Omset Bersih</div><div class="kpi-val" id="pr-omset">–</div><div class="kpi-sub">target × Shopee Mall (after PPN)</div></div>
-        <div class="kpi a-amber"><div class="kpi-lbl">Proyeksi Profit</div><div class="kpi-val" id="pr-profit">–</div><div class="kpi-sub" id="pr-profit-s">omset × rata-rata target profit</div></div>
-      </div>
-
-      <!-- charts: tren + pie kategori (2 kolom, kompak) -->
-      <div class="dash-grid" style="margin-bottom:16px">
-        <div class="dcard">
-          <div class="dcard-h">📈 Tren Realisasi Mingguan <span class="dcard-sub" id="trendNote"></span></div>
-          <div class="dcard-b" style="padding:14px 16px"><div id="trendChart"></div></div>
-        </div>
-        <div class="dcard">
-          <div class="dcard-h">🥧 Realisasi per Kategori <span class="dcard-sub" id="catPieNote"></span></div>
-          <div class="dcard-b" style="padding:14px 16px"><div id="catPie"></div></div>
-        </div>
-      </div>
-
       <!-- focus table -->
       <div class="panel" style="margin-bottom:16px">
         <div class="panel-head">
           <span class="panel-title">⭐ SKU Fokus <span class="pg-info" id="focusCount"></span></span>
           <div class="panel-actions">
+            <button class="tbtn" style="color:var(--red);border-color:var(--red)" onclick="removeAllFocus()">🗑 Hapus Semua</button>
             <div class="sku-search" style="margin-top:0;max-width:240px">
               <input class="sku-search-inp" id="focusSearchInp" placeholder="🔍 ketik kode/nama SKU…" autocomplete="off"
                 oninput="focusSearchInput(this.value)" onfocus="focusSearchInput(this.value)"
@@ -3121,6 +3146,8 @@ function setProyMode(m){
   document.getElementById('modeUnit').classList.toggle('active',m==='unit');
   document.getElementById('modeRupiah').classList.toggle('active',m==='rupiah');
   document.getElementById('proyUnitView').style.display=m==='unit'?'':'none';
+  document.getElementById('proyUnitViewLeft').style.display=m==='unit'?'':'none';
+  document.getElementById('proyUnitViewRight').style.display=m==='unit'?'':'none';
   document.getElementById('proyRupiahView').style.display=m==='rupiah'?'':'none';
   if(m==='rupiah')renderAudit();
 }
@@ -3155,11 +3182,30 @@ function renderProyeksi(){
   const pps=document.getElementById('pr-profit-s'); if(pps)pps.textContent='omset × rata-rata TP '+avgTprofit.toFixed(1).replace('.',',')+'%';
 
   renderFocusTable();
+  renderFocusKPI();
   renderTrend();
   renderCatPie();
   renderProyTable();
   renderFocusPicker();
   if(typeof applyPerms==='function'&&currentUser)applyPerms();
+}
+function renderFocusKPI(){
+  const note=document.getElementById('focusKpiNote');
+  if(!focusSkus.length){
+    setKPI('fk-target','–'); setKPI('fk-real','–'); setKPI('fk-ach','–');
+    if(note)note.textContent='belum ada SKU fokus';
+    return;
+  }
+  let tTar=0,tReal=0;
+  focusSkus.forEach(sku=>{
+    const c=proyCalc(sku);
+    tTar+=c.target||0; tReal+=c.real||0;
+  });
+  const ach=tTar>0?tReal/tTar:0;
+  setKPI('fk-target',tTar.toLocaleString('id-ID'));
+  setKPI('fk-real',tReal.toLocaleString('id-ID'));
+  setKPI('fk-ach',pct(ach));
+  if(note)note.textContent=`${focusSkus.length} SKU`;
 }
 
 function weekHeaders(nW){let h='';for(let i=0;i<nW;i++)h+=`<th><div class="th-inner r">W${i+1}</div></th>`;return h;}
@@ -3284,7 +3330,18 @@ function focusSearchInput(q){
 function pickFocus(sku){const list=getFocusList();if(!list.includes(sku)){list.push(sku);saveFocus(proyMonth,sku,true);}const inp=document.getElementById('focusSearchInp');if(inp)inp.value='';closeFocusDrop();renderProyeksi();}
 function closeFocusDrop(){const d=document.getElementById('focusDrop');if(d)d.classList.remove('open');}
 function addFocus(){/* deprecated: pakai pickFocus via search */}
-function removeFocus(sku){focusByMonth[proyMonth]=getFocusList().filter(s=>s!==sku);saveFocus(proyMonth,sku,false);renderProyeksi();}
+function removeFocus(sku){
+  if(!confirm(`Lepas "${sku}" dari SKU Fokus?\nTarget & realisasi yang sudah diisi tetap tersimpan, cuma gak dipantau di sini lagi.`))return;
+  focusByMonth[proyMonth]=getFocusList().filter(s=>s!==sku);saveFocus(proyMonth,sku,false);renderProyeksi();
+}
+function removeAllFocus(){
+  if(!focusSkus.length){alert('Belum ada SKU fokus.');return;}
+  if(!confirm(`Lepas SEMUA ${focusSkus.length} SKU dari daftar fokus?\nTarget & realisasi yang sudah diisi tetap tersimpan.`))return;
+  const skus=[...focusSkus];
+  focusByMonth[proyMonth]=[];
+  skus.forEach(sku=>saveFocus(proyMonth,sku,false));
+  renderProyeksi();
+}
 
 function renderTrend(){
   const nW=weeksInMonth(proyMonth);
