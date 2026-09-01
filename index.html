@@ -487,6 +487,12 @@ tr.row-het-bad td{background:rgba(240,97,109,.05)}
 .dcard{background:var(--panel-grad);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid var(--line);border-radius:15px;overflow:hidden;box-shadow:var(--shadow-md),inset 0 1px 0 rgba(255,255,255,.03)}
 .dcard-h{padding:12px 16px;border-bottom:1px solid var(--line);font-size:12.5px;font-weight:600}
 .dcard-b{padding:15px 16px}
+.top10-row{display:flex;align-items:center;gap:10px;padding:6px 16px;font-size:11.5px}
+.top10-row:hover{background:rgba(255,255,255,.03)}
+.top10-rank{width:16px;flex-shrink:0;color:var(--txt-3);font-weight:600;font-size:10.5px}
+.top10-sku{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-family:'JetBrains Mono',monospace;font-size:10.5px}
+.top10-val{flex-shrink:0;font-weight:600;font-family:'Space Grotesk',sans-serif;font-size:11.5px}
+.top10-empty{padding:16px;text-align:center;color:var(--txt-3);font-size:11px}
 .kat-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line-soft)}
 .kat-row:last-child{border-bottom:none}
 .kat-n{font-size:11px;font-weight:500;width:96px;flex-shrink:0;color:var(--txt-2)}
@@ -790,6 +796,14 @@ tr.row-het-bad td{background:rgba(240,97,109,.05)}
             <div class="kpi-row" style="grid-template-columns:1fr 1fr">
               <div class="kpi kpi-sm a-green"><div class="kpi-lbl">Proyeksi Omset Bersih</div><div class="kpi-val" id="pr-omset">–</div><div class="kpi-sub">target × Shopee Mall (after PPN)</div></div>
               <div class="kpi kpi-sm a-amber"><div class="kpi-lbl">Proyeksi Profit</div><div class="kpi-val" id="pr-profit">–</div><div class="kpi-sub" id="pr-profit-s">omset × rata-rata target profit</div></div>
+            </div>
+            <div class="dcard" style="margin-top:10px">
+              <div class="dcard-h">🏆 Top 10 Omset <span class="dcard-sub">realisasi aktual, semua SKU</span></div>
+              <div class="dcard-b" style="padding:6px 0" id="top10OmsetList"></div>
+            </div>
+            <div class="dcard" style="margin-top:10px">
+              <div class="dcard-h">💰 Top 10 Profit <span class="dcard-sub">realisasi aktual, semua SKU</span></div>
+              <div class="dcard-b" style="padding:6px 0" id="top10ProfitList"></div>
             </div>
           </div>
         </div>
@@ -3183,11 +3197,34 @@ function renderProyeksi(){
 
   renderFocusTable();
   renderFocusKPI();
+  renderTop10();
   renderTrend();
   renderCatPie();
   renderProyTable();
   renderFocusPicker();
   if(typeof applyPerms==='function'&&currentUser)applyPerms();
+}
+function renderTop10(){
+  const omsetEl=document.getElementById('top10OmsetList'), profitEl=document.getElementById('top10ProfitList');
+  if(!omsetEl||!profitEl)return;
+  const monthData=PROY[proyMonth]||{};
+  const list=[];
+  proySkuList().forEach(s=>{
+    const pd=monthData[s.sku]; if(!pd)return;
+    const c=proyCalc(s.sku);
+    if(!c.real||c.real<=0)return;
+    const p=s.plat[defaultStoreForPlatform('shopee_mall')]; if(!p||!(p.harga>0))return;
+    const cc=calc({...s,...p},'shopee_mall');
+    const omset=cc.afterPPn*c.real;
+    const profit=omset*((p.tprofit||0)/100);
+    list.push({sku:s.sku,omset,profit});
+  });
+  const renderList=(el,sorted,key)=>{
+    if(!sorted.length){el.innerHTML='<div class="top10-empty">Belum ada realisasi berbayar bulan ini.</div>';return;}
+    el.innerHTML=sorted.slice(0,10).map((r,i)=>`<div class="top10-row"><span class="top10-rank">#${i+1}</span><span class="top10-sku" title="${escAttr(r.sku)}">${escAttr(r.sku)}</span><span class="top10-val">${fmt(r[key])}</span></div>`).join('');
+  };
+  renderList(omsetEl,[...list].sort((a,b)=>b.omset-a.omset),'omset');
+  renderList(profitEl,[...list].sort((a,b)=>b.profit-a.profit),'profit');
 }
 function renderFocusKPI(){
   const note=document.getElementById('focusKpiNote');
