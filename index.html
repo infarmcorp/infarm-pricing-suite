@@ -208,6 +208,7 @@ input[type=number]{-moz-appearance:textfield;appearance:textfield}
 .inp:focus{outline:none;border-color:var(--blue);background:var(--blue-soft);box-shadow:0 0 0 2px var(--blue-glow)}
 .inp.editable{border-color:rgba(77,163,255,.35)}
 .inp-s{width:52px}.inp-xs{width:46px}.inp-pct{width:64px}
+.inp-left{text-align:left;width:130px}
 .troas-val{font-family:'JetBrains Mono',monospace;font-size:11px;font-weight:700;color:var(--blue)}
 .het-row-bad{background:rgba(240,97,109,.07)}
 .het-row-bad:hover{background:rgba(240,97,109,.12)}
@@ -2679,10 +2680,10 @@ function renderKalkulator(){
     const hetBad=p.het>=p.harga;
     html+=`<tr class="${hetBad?'row-het-bad':''}">
       <td><input type="checkbox" class="calc-row-chk" data-sku="${escAttr(s.sku)}" ${selectedSkus.has(s.sku)?'checked':''} onclick="toggleSelectSku(this)"></td>
-      <td class="td-sku">${s.sku}</td>
-      <td><span class="cat">${s.kat}</span></td>
-      <td><span class="tipe ${tipeC(s.tipe)}">${s.tipe}</span></td>
-      <td class="num">${fmt(s.hpp)}</td>
+      <td><input class="inp editable td-sku inp-left" data-col="sku" type="text" value="${escAttr(s.sku)}" onchange="updMasterText(${i},'sku',this.value)"></td>
+      <td><input class="inp editable inp-left" style="width:100px" data-col="kat" type="text" value="${escAttr(s.kat)}" onchange="updMasterText(${i},'kat',this.value)"></td>
+      <td><input class="inp editable inp-left" style="width:90px" data-col="tipe" type="text" value="${escAttr(s.tipe)}" onchange="updMasterText(${i},'tipe',this.value)"></td>
+      <td class="num"><input class="inp editable inp-s" data-col="hpp" type="number" value="${s.hpp}" onchange="updBase(${i},'hpp',this.value)"></td>
       <td class="num"><input class="inp editable" data-col="harga" type="number" value="${p.harga}" onchange="upd(${i},'harga',this.value)"></td>
       <td class="num"><input class="inp editable inp-xs" data-col="minbeli" type="number" value="${p.minbeli}" onchange="upd(${i},'minbeli',this.value)"></td>`;
     if(tt){
@@ -2745,11 +2746,40 @@ function delSku(i){
 }
 function upd(i,f,v){const old=SKUS[i].plat[currentStore][f];snapshot('ubah '+f+' '+SKUS[i].sku);SKUS[i].plat[currentStore][f]=parseFloat(v)||0;logChange('Ubah '+f.toUpperCase(),SKUS[i].sku+' ('+(STORES[currentStore]?STORES[currentStore].name:currentStore)+')',old,SKUS[i].plat[currentStore][f]);preserveKalkOrder=true;renderKalkulator();preserveKalkOrder=false;saveSku(SKUS[i].sku);}
 function updBase(i,f,v){const old=SKUS[i][f];snapshot('ubah '+f+' '+SKUS[i].sku);SKUS[i][f]=(f==='zone')?v:(parseFloat(v)||0);logChange('Ubah '+f.toUpperCase(),SKUS[i].sku,old,SKUS[i][f]);preserveKalkOrder=true;renderKalkulator();preserveKalkOrder=false;saveSku(SKUS[i].sku);}
+function updMasterText(i,f,v){
+  const s=SKUS[i]; if(!s)return;
+  const old=s[f];
+  if(f==='sku'){
+    const newSku=String(v||'').trim().toUpperCase();
+    if(!newSku){alert('SKU tidak boleh kosong.');renderKalkulator();return;}
+    if(newSku!==old && SKUS.some((x,j)=>j!==i&&x.sku===newSku)){alert(`SKU "${newSku}" sudah dipakai SKU lain.`);renderKalkulator();return;}
+    if(newSku===old)return;
+    snapshot('ubah SKU '+old+' -> '+newSku);
+    const oldSku=old;
+    s.sku=newSku;
+    logChange('Ubah SKU', oldSku+' → '+newSku, oldSku, newSku);
+    deleteSkuDB(oldSku);
+    saveSku(newSku);
+    selectedSkus.delete(oldSku);
+  } else {
+    const val=String(v||'').trim().toUpperCase();
+    if(val===old)return;
+    snapshot('ubah '+f+' '+s.sku);
+    s[f]=val;
+    logChange('Ubah '+f.toUpperCase(), s.sku, old, val);
+    saveSku(s.sku);
+  }
+  preserveKalkOrder=true; renderKalkulator(); preserveKalkOrder=false;
+}
 function addSku(){
-  SKUS.push({sku:'SKU-BARU', kat:'BAG', tipe:'NEW', hpp:0, berat:100, zone:'Jawa ( selain jakarta )',
-    plat:{[currentStore]:{harga:0,minbeli:1,tprofit:10,afil:0,ads:0,het:0}}});
+  const rec={sku:'SKU-BARU', kat:'BAG', tipe:'NEW', hpp:0, berat:100, zone:'Jawa ( selain jakarta )',
+    plat:{[currentStore]:{harga:0,minbeli:1,tprofit:10,afil:0,ads:0,het:0}}};
+  let n=1; while(SKUS.some(s=>s.sku===rec.sku)){ n++; rec.sku='SKU-BARU-'+n; }
+  SKUS.unshift(rec);                     // taruh di paling atas biar langsung kelihatan
+  sortState={col:null,dir:null}; filters={}; curPage=1;   // reset supaya tidak ketutup sort/filter/halaman lain
   renderKalkulator();
-  saveSku('SKU-BARU');
+  saveSku(rec.sku);
+  setTimeout(()=>{ const el=document.querySelector('.td-sku'); if(el){el.focus(); el.select();} },50);
 }
 
 // ── Upload massal Kalkulator (per platform) ──
