@@ -444,6 +444,7 @@ tr.row-het-bad td{background:rgba(240,97,109,.05)}
 .tc-leg{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--txt-2)}
 .tc-line{width:18px;height:3px;border-radius:2px}
 .del-x{cursor:pointer;color:var(--txt-3);font-size:14px;padding:2px 6px;border-radius:5px}
+.st-dot{display:inline-block;width:12px;height:12px;border-radius:50%;box-shadow:0 0 6px currentColor}
 .del-x:hover{background:var(--red-bg);color:var(--red)}
 
 /* upload guide */
@@ -3147,8 +3148,9 @@ function proyCalc(sku){
   const fcAch=target>0?forecast/target:0;
   return {target,weeks,real,ach,forecast,fcAch,nW,de,td};
 }
-const stPill=a=>a>=1?'p-pos':'p-neg';
-const stLabel=a=>a>=1?'✅ Tercapai':'❌ Tidak Tercapai';
+const stPill=a=>a>=1?'p-pos':a>=0.8?'p-warn':'p-neg';
+const stLabel=a=>a>=1?'✅ Tercapai':a>=0.8?'⚠️ Hampir':'❌ Tidak Tercapai';
+const stDot=a=>{const c=a>=1?'var(--green)':a>=0.8?'var(--amber)':'var(--red)';const t=a>=1?'On track':a>=0.8?'Perlu optimasi':'Kemungkinan tidak tercapai';return `<span class="st-dot" style="background:${c}" title="${t} (${pct(a)})"></span>`;};
 
 function setProyMonth(v){proyMonth=v;proyPage=1;const ps=document.getElementById('psub');if(ps)ps.textContent='Target per SKU — '+monthLabel(v);renderProyeksi();}
 function openUploadGuide(){document.getElementById('uploadGuide').style.display='block';}
@@ -3297,7 +3299,7 @@ function renderProyTable(){
       <td class="num">${c.target?`<span class="pill ${stPill(c.ach)}">${pct(c.ach)}</span>`:'–'}</td>
       <td class="num">${c.target&&c.de>0?Math.round(c.forecast):'–'}</td>
       <td class="num">${c.target&&c.de>0?`<span class="fc-pill ${stPill(c.fcAch)}">${pct(c.fcAch)}</span>`:'–'}</td>
-      <td>${c.target&&c.de>0?stLabel(c.fcAch):'<span style="color:var(--txt-3)">–</span>'}</td>
+      <td>${c.target&&c.de>0?stDot(c.fcAch):'<span style="color:var(--txt-3)">–</span>'}</td>
     </tr>`;
   });
   if(!pageRows.length)html+=`<tr><td colspan="${nW+7}"><div class="empty">Tidak ada SKU cocok.</div></td></tr>`;
@@ -3345,7 +3347,7 @@ function renderFocusTable(){
       <td class="num">${c.target?`<span class="pill ${stPill(c.ach)}">${pct(c.ach)}</span>`:'–'}</td>
       <td class="num">${c.target&&c.de>0?Math.round(c.forecast):'–'}</td>
       <td class="num">${c.target&&c.de>0?`<span class="fc-pill ${stPill(c.fcAch)}">${pct(c.fcAch)}</span>`:'–'}</td>
-      <td>${c.target&&c.de>0?stLabel(c.fcAch):'<span style="color:var(--txt-3)">–</span>'}</td>
+      <td>${c.target&&c.de>0?stDot(c.fcAch):'<span style="color:var(--txt-3)">–</span>'}</td>
       <td><span class="del-x" onclick="removeFocus('${sku}')" title="Hapus dari fokus">✕</span></td>
     </tr>`;
   });
