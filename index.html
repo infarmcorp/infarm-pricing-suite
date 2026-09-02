@@ -4521,12 +4521,27 @@ function dbStatus(msg,type){
 }
 
 // ── LOAD semua data dari database ──
+// Ambil SEMUA baris dari sebuah tabel, menembus batas default 1000 baris/request Supabase
+async function fetchAllRows(table, orderCol){
+  const PAGE=1000;
+  let all=[], from=0, keepGoing=true;
+  while(keepGoing){
+    let q=supa.from(table).select('*').range(from, from+PAGE-1);
+    if(orderCol)q=q.order(orderCol);
+    const {data, error}=await q;
+    if(error)return {data:null, error};
+    all=all.concat(data||[]);
+    keepGoing=(data&&data.length===PAGE);
+    from+=PAGE;
+  }
+  return {data:all, error:null};
+}
 async function loadFromDB(){
   if(!supa)return false;
   try{
     dbStatus('⏳ Memuat data…','save');
     // SKUS
-    const {data:skuRows,error:e1}=await supa.from('skus').select('*');
+    const {data:skuRows,error:e1}=await fetchAllRows('skus','sku');
     if(e1)throw e1;
     if(skuRows&&skuRows.length){
       SKUS.length=0;
@@ -4547,7 +4562,7 @@ async function loadFromDB(){
       }
     }
     // PROYEKSI
-    const {data:proyRows,error:e2}=await supa.from('proyeksi').select('*');
+    const {data:proyRows,error:e2}=await fetchAllRows('proyeksi','updated_at');
     if(e2){console.error('Load proyeksi error:',e2);dbStatus('⚠️ Gagal muat Proyeksi: '+(e2.message||e2.code||'unknown'),'err');}
     if(proyRows){Object.keys(PROY).forEach(k=>delete PROY[k]);
       Object.keys(focusByMonth).forEach(k=>delete focusByMonth[k]);
@@ -4557,11 +4572,11 @@ async function loadFromDB(){
         if(r.fokus){if(!focusByMonth[r.month])focusByMonth[r.month]=[];focusByMonth[r.month].push(r.sku);}
       });}
     // ADS
-    const {data:adsRows,error:e3}=await supa.from('ads').select('*').order('id');
+    const {data:adsRows,error:e3}=await fetchAllRows('ads','id');
     if(e3){console.error('Load ads error:',e3);}
     if(adsRows){ADS.length=0;adsRows.forEach(r=>ADS.push({id:r.id,month:r.month||proyMonth,listing:r.listing,platform:r.platform,spend:+r.spend||0,gmv:+r.gmv||0,roas:+r.roas||0}));}
     // LISTING_MAP
-    const {data:mapRows,error:e4}=await supa.from('listing_map').select('*');
+    const {data:mapRows,error:e4}=await fetchAllRows('listing_map');
     if(e4){console.error('Load listing_map error:',e4);}
     if(mapRows){Object.keys(LISTING_MAP).forEach(k=>delete LISTING_MAP[k]);
       mapRows.forEach(r=>{LISTING_MAP[r.listing_key]=r.skus||[];});}
