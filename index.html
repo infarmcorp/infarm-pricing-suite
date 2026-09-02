@@ -827,7 +827,10 @@ tr.row-het-bad td{background:rgba(240,97,109,.05)}
           </div>
           <div class="dcard">
             <div class="dcard-h">🥧 Realisasi per Kategori <span class="dcard-sub" id="catPieNote"></span></div>
-            <div class="dcard-b" style="padding:14px 16px"><div id="catPie"></div></div>
+            <div class="dcard-b" style="padding:14px 16px">
+              <div id="catPie"></div>
+              <div id="catPieAll" style="margin-top:14px;padding-top:14px;border-top:1px solid var(--line-soft)"></div>
+            </div>
           </div>
         </div>
       </div>
@@ -3423,7 +3426,8 @@ function renderCatPie(){
   list.forEach(sku=>{const s=SKUS.find(x=>x.sku===sku);if(!s)return;const c=proyCalc(sku);byCat[s.kat]=(byCat[s.kat]||0)+(c.real||0);});
   let cats=Object.entries(byCat).filter(([k,v])=>v>0).sort((a,b)=>b[1]-a[1]);
   const note=document.getElementById('catPieNote'); if(note)note.textContent=focusSkus.length?`${focusSkus.length} SKU fokus`:'semua SKU berdata';
-  if(!cats.length){el.innerHTML=`<div class="empty" style="padding:30px 0">Belum ada realisasi. Isi data di tabel bawah.</div>`;return;}
+  if(!cats.length){el.innerHTML=`<div class="empty" style="padding:30px 0">Belum ada realisasi. Isi data di tabel bawah.</div>`;}
+  else{
   // gabung kategori kecil jadi "Lainnya" bila > 6
   if(cats.length>6){const top=cats.slice(0,6);const rest=cats.slice(6).reduce((a,[,v])=>a+v,0);top.push(['Lainnya',rest]);cats=top;}
   const total=cats.reduce((a,[,v])=>a+v,0)||1;
@@ -3442,6 +3446,31 @@ function renderCatPie(){
       </svg>
       <div class="pie-legend">${legend}</div>
     </div>`;
+  }
+  renderCatPieAll();
+}
+function renderCatPieAll(){
+  const el=document.getElementById('catPieAll'); if(!el)return;
+  // sama seperti di atas, tapi SELALU semua SKU berdata (gak peduli fokus) — buat perbandingan gambaran menyeluruh
+  const list=Object.keys(PROY[proyMonth]||{});
+  const byCat={};
+  list.forEach(sku=>{const s=SKUS.find(x=>x.sku===sku);if(!s)return;const c=proyCalc(sku);byCat[s.kat]=(byCat[s.kat]||0)+(c.real||0);});
+  let cats=Object.entries(byCat).filter(([k,v])=>v>0).sort((a,b)=>b[1]-a[1]);
+  const heading=`<div style="font-size:10.5px;font-weight:600;color:var(--txt-3);text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px">🌐 Semua SKU (bukan cuma fokus)</div>`;
+  if(!cats.length){el.innerHTML=heading+`<div class="empty" style="padding:14px 0;font-size:11px">Belum ada realisasi bulan ini.</div>`;return;}
+  if(cats.length>6){const top=cats.slice(0,6);const rest=cats.slice(6).reduce((a,[,v])=>a+v,0);top.push(['Lainnya',rest]);cats=top;}
+  const total=cats.reduce((a,[,v])=>a+v,0)||1;
+  const COLORS=['#4DA3FF','#5FD3A0','#E8BC63','#A78BFA','#F58892','#22B0EE','#65737F'];
+  const bars=cats.map(([k,v],i)=>{
+    const pctv=Math.round(v/total*100);
+    return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:7px;font-size:11px">
+      <span style="width:9px;height:9px;border-radius:50%;background:${COLORS[i%COLORS.length]};flex-shrink:0"></span>
+      <span style="width:88px;flex-shrink:0;color:var(--txt-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${k}</span>
+      <span style="flex:1;background:var(--bg);border-radius:4px;height:7px;overflow:hidden"><span style="display:block;height:100%;width:${pctv}%;background:${COLORS[i%COLORS.length]}"></span></span>
+      <span style="width:36px;text-align:right;flex-shrink:0;font-weight:600;font-family:'Space Grotesk',sans-serif">${pctv}%</span>
+    </div>`;
+  }).join('');
+  el.innerHTML=heading+bars+`<div style="font-size:10px;color:var(--txt-3);margin-top:6px">Total: ${total.toLocaleString('id-ID')} unit</div>`;
 }
 
 function updTarget(sku,v){const old=getProy(sku).target;snapshot('ubah target '+sku);getProy(sku).target=parseInt(v)||0;logChange('Ubah Target',sku+' ('+proyMonth+')',old,getProy(sku).target);preserveProyOrder=true;renderProyeksi();preserveProyOrder=false;saveProy(proyMonth,sku);}
