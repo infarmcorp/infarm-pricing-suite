@@ -839,7 +839,6 @@ tr.row-het-bad td{background:rgba(240,97,109,.05)}
         <div class="panel-head">
           <span class="panel-title">⭐ SKU Fokus <span class="pg-info" id="focusCount"></span></span>
           <div class="panel-actions">
-            <button class="tbtn" style="color:var(--red);border-color:var(--red)" onclick="removeAllFocus()">🗑 Hapus Semua</button>
             <div class="sku-search" style="margin-top:0;max-width:240px">
               <input class="sku-search-inp" id="focusSearchInp" placeholder="🔍 ketik kode/nama SKU…" autocomplete="off"
                 oninput="focusSearchInput(this.value)" onfocus="focusSearchInput(this.value)"
@@ -3560,7 +3559,10 @@ function applyUpload(rows,kind,mode){
   // simpan ke DB
   if(supa&&dbReady){(async()=>{
     const rows=[];Object.entries(PROY[proyMonth]||{}).forEach(([sku,d])=>rows.push({month:proyMonth,sku,target:d.target||0,weeks:d.weeks||[]}));
-    if(rows.length)await supa.from('proyeksi').upsert(rows,{onConflict:'month,sku'});
+    if(rows.length){
+      const {error}=await supa.from('proyeksi').upsert(rows,{onConflict:'month,sku'});
+      if(error){console.error('Bulk save proyeksi error:',error);dbStatus('⚠️ Gagal simpan: '+(error.message||error.code||'unknown'),'err');return;}
+    }
     dbStatus('✓ Proyeksi tersimpan','save');
   })();}
 }
@@ -4545,7 +4547,8 @@ async function loadFromDB(){
       }
     }
     // PROYEKSI
-    const {data:proyRows}=await supa.from('proyeksi').select('*');
+    const {data:proyRows,error:e2}=await supa.from('proyeksi').select('*');
+    if(e2){console.error('Load proyeksi error:',e2);dbStatus('⚠️ Gagal muat Proyeksi: '+(e2.message||e2.code||'unknown'),'err');}
     if(proyRows){Object.keys(PROY).forEach(k=>delete PROY[k]);
       Object.keys(focusByMonth).forEach(k=>delete focusByMonth[k]);
       proyRows.forEach(r=>{
@@ -4554,10 +4557,12 @@ async function loadFromDB(){
         if(r.fokus){if(!focusByMonth[r.month])focusByMonth[r.month]=[];focusByMonth[r.month].push(r.sku);}
       });}
     // ADS
-    const {data:adsRows}=await supa.from('ads').select('*').order('id');
+    const {data:adsRows,error:e3}=await supa.from('ads').select('*').order('id');
+    if(e3){console.error('Load ads error:',e3);}
     if(adsRows){ADS.length=0;adsRows.forEach(r=>ADS.push({id:r.id,month:r.month||proyMonth,listing:r.listing,platform:r.platform,spend:+r.spend||0,gmv:+r.gmv||0,roas:+r.roas||0}));}
     // LISTING_MAP
-    const {data:mapRows}=await supa.from('listing_map').select('*');
+    const {data:mapRows,error:e4}=await supa.from('listing_map').select('*');
+    if(e4){console.error('Load listing_map error:',e4);}
     if(mapRows){Object.keys(LISTING_MAP).forEach(k=>delete LISTING_MAP[k]);
       mapRows.forEach(r=>{LISTING_MAP[r.listing_key]=r.skus||[];});}
     dbReady=true;
@@ -4606,15 +4611,17 @@ async function deleteSkuDB(sku){
 async function saveProy(month,sku){
   if(!supa||!dbReady)return;
   const d=PROY[month]&&PROY[month][sku];if(!d)return;
-  try{await supa.from('proyeksi').upsert({month,sku,target:d.target||0,weeks:d.weeks||[]},{onConflict:'month,sku'});
-    dbStatus('✓ Tersimpan','save');}catch(e){dbStatus('⚠️ Gagal simpan','err');}
+  try{const {error}=await supa.from('proyeksi').upsert({month,sku,target:d.target||0,weeks:d.weeks||[]},{onConflict:'month,sku'});
+    if(error)throw error;
+    dbStatus('✓ Tersimpan','save');}catch(e){console.error('Save proyeksi error:',e);dbStatus('⚠️ Gagal simpan: '+(e.message||e.code||'unknown'),'err');}
 }
 async function saveFocus(month,sku,isFokus){
   if(!supa||!dbReady)return;
   // pastikan ada baris proyeksi utk SKU ini di bulan tsb, lalu set kolom fokus
   const d=(PROY[month]&&PROY[month][sku])||{target:0,weeks:[]};
-  try{await supa.from('proyeksi').upsert({month,sku,target:d.target||0,weeks:d.weeks||[],fokus:!!isFokus},{onConflict:'month,sku'});
-    dbStatus('✓ SKU fokus tersimpan','save');}catch(e){dbStatus('⚠️ Gagal simpan fokus','err');}
+  try{const {error}=await supa.from('proyeksi').upsert({month,sku,target:d.target||0,weeks:d.weeks||[],fokus:!!isFokus},{onConflict:'month,sku'});
+    if(error)throw error;
+    dbStatus('✓ SKU fokus tersimpan','save');}catch(e){console.error('Save fokus error:',e);dbStatus('⚠️ Gagal simpan fokus: '+(e.message||e.code||'unknown'),'err');}
 }
 async function saveListingMap(key){
   if(!supa||!dbReady)return;
