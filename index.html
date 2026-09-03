@@ -163,6 +163,7 @@ body::after{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;opac
 .tbtn{background:var(--bg-3);border:1px solid var(--line);border-radius:7px;padding:6px 11px;font-size:10.5px;color:var(--txt-2);cursor:pointer;display:flex;align-items:center;gap:5px;font-family:'Inter',sans-serif;transition:.13s}
 .tbtn.danger-outline{border-color:rgba(245,136,146,.4);color:#F8A5AD}
 .tbtn.danger-outline:hover{background:var(--red-bg);border-color:var(--red)}
+.tbtn.icon-btn{width:34px;padding:0;display:inline-flex;align-items:center;justify-content:center;text-decoration:none}
 .tbtn:hover{background:var(--bg-hover);color:var(--txt);border-color:var(--blue)}
 .tbtn.clear{color:var(--amber);border-color:var(--amber)}
 
@@ -4238,7 +4239,7 @@ function renderTugas(){
       <td>${new Date(t.deadline+'T00:00:00').toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'})}</td>
       <td><span class="pill ${pillClass}">${TUGAS_STATUS_LABEL[s]}</span></td>
       <td>${t.completed_at?new Date(t.completed_at).toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'}):`<button class="tbtn" onclick="markTugasDone('${t.id}')">✓ Tandai Selesai</button>`}</td>
-      <td><a class="tbtn" href="${tugasGCalLink(t)}" target="_blank" rel="noopener" title="Tambah ke Google Calendar">📅 Calendar</a> <button class="tbtn danger-outline" title="Hapus tugas" onclick="deleteTugas('${t.id}')">🗑</button></td>
+      <td style="display:flex;gap:6px"><a class="tbtn icon-btn" href="${tugasGCalLink(t)}" target="_blank" rel="noopener" title="Tambah ke Google Calendar">📅</a><button class="tbtn danger-outline icon-btn" title="Hapus tugas" onclick="deleteTugas('${t.id}')">🗑</button></td>
     </tr>`;
   });
   if(!rows.length)html+=`<tr><td colspan="6"><div class="empty">${scoped.length?'Tidak ada baris cocok filter.':'Belum ada tugas. Klik "+ Tambah Tugas" untuk mulai.'}</div></td></tr>`;
