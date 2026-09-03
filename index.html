@@ -4181,6 +4181,7 @@ async function loadTasks(){
   renderTugas();
 }
 function picName(id){const u=PIC_LIST.find(x=>x.id===id);return u?(u.nama||u.email):'–';}
+function picEmail(id){const u=PIC_LIST.find(x=>x.id===id);return u?(u.email||''):'';}
 function tugasGCalLink(t){
   // buka Google Calendar dengan detail tugas sudah keisi otomatis (link biasa, tanpa API/OAuth)
   const d=new Date(t.deadline+'T00:00:00');
@@ -4188,7 +4189,10 @@ function tugasGCalLink(t){
   const fmt=x=>x.getFullYear()+String(x.getMonth()+1).padStart(2,'0')+String(x.getDate()).padStart(2,'0');
   const text=encodeURIComponent('📋 Tugas: '+t.judul);
   const details=encodeURIComponent((t.deskripsi||'')+'\n\nPIC: '+picName(t.pic)+'\n\n— dari Infarm Pricing Suite');
-  return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${text}&dates=${fmt(d)}/${fmt(end)}&details=${details}`;
+  const email=picEmail(t.pic);
+  let url=`https://calendar.google.com/calendar/render?action=TEMPLATE&text=${text}&dates=${fmt(d)}/${fmt(end)}&details=${details}`;
+  if(email)url+=`&add=${encodeURIComponent(email)}`;
+  return url;
 }
 function tugasStatus(t){
   if(t.completed_at)return (new Date(t.completed_at)<=new Date(t.deadline+'T23:59:59'))?'ontime':'late';
