@@ -4234,7 +4234,7 @@ function renderTugas(){
     const s=tugasStatus(t);
     const pillClass=s==='ontime'?'p-pos':(s==='open'?'p-warn':'p-neg');
     html+=`<tr>
-      <td class="td-sku">${escAttr(t.judul)}${t.deskripsi?`<div class="pg-info" style="margin:2px 0 0">${escAttr(t.deskripsi)}</div>`:''}</td>
+      <td class="td-sku" style="max-width:220px"><div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${escAttr(t.judul)}">${escAttr(t.judul)}</div>${t.deskripsi?`<div class="pg-info" style="margin:2px 0 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${escAttr(t.deskripsi)}">${escAttr(t.deskripsi)}</div>`:''}</td>
       <td><span class="cat">${escAttr(picName(t.pic))}</span></td>
       <td>${new Date(t.deadline+'T00:00:00').toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'})}</td>
       <td><span class="pill ${pillClass}">${TUGAS_STATUS_LABEL[s]}</span></td>
