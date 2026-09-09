@@ -181,6 +181,7 @@ tr.row-het-bad td:first-child{background:#1c1318}
 .th-label{cursor:default}
 .th-sortable{cursor:pointer;user-select:none}
 .th-sortable:hover{color:var(--txt)}
+#focusTable thead th{position:sticky;top:0;z-index:3;background:var(--bg-2)}
 .fbtn{width:17px;height:17px;border-radius:4px;border:none;background:transparent;color:var(--txt-3);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;transition:.12s}
 .fbtn:hover{background:var(--bg-hover);color:var(--blue)}
 .fbtn.on{color:var(--blue);background:var(--blue-soft)}
@@ -3334,25 +3335,39 @@ function toggleFocusSort(col){
   renderFocusTable();
 }
 function focusSortInd(col){return focusSort.col===col?`<span class="sort-ind">${focusSort.dir==='asc'?'▲':'▼'}</span>`:'';}
+function focusSortValue(item,col){
+  const {sku,s,c}=item;
+  if(col==='sku')return sku;
+  if(col==='kat')return s.kat;
+  if(col==='target')return c.target||0;
+  if(col==='real')return c.real||0;
+  if(col==='ach')return c.target?c.ach:-999;
+  if(col==='proyAkhir')return (c.target&&c.de>0)?c.forecast:-999;
+  if(col==='status')return (c.target&&c.de>0)?c.fcAch:-999;
+  if(col&&col[0]==='w')return c.weeks[+col.slice(1)]||0;
+  return 0;
+}
 function renderFocusTable(){
   const nW=weeksInMonth(proyMonth);
   document.getElementById('focusCount').textContent=focusSkus.length?`(${focusSkus.length} SKU)`:'';
+  let wkHead='';for(let w=0;w<nW;w++)wkHead+=`<th><div class="th-inner r th-sortable" onclick="toggleFocusSort('w${w}')">W${w+1} ${focusSortInd('w'+w)}</div></th>`;
   let html=`<thead><tr>
-    <th><div class="th-inner th-sortable" onclick="toggleFocusSort('sku')">SKU ${focusSortInd('sku')}</div></th><th><div class="th-inner">Kategori</div></th>
-    <th><div class="th-inner r">Target</div></th>${weekHeaders(nW)}
-    <th><div class="th-inner r">Real</div></th><th><div class="th-inner r">Ach %</div></th>
-    <th><div class="th-inner r">Proy. Akhir</div></th><th><div class="th-inner r">Proy. %</div></th>
-    <th><div class="th-inner th-sortable" onclick="toggleFocusSort('status')">Status ${focusSortInd('status')}</div></th><th><div class="th-inner"></div></th>
+    <th><div class="th-inner th-sortable" onclick="toggleFocusSort('sku')">SKU ${focusSortInd('sku')}</div></th>
+    <th><div class="th-inner th-sortable" onclick="toggleFocusSort('kat')">Kategori ${focusSortInd('kat')}</div></th>
+    <th><div class="th-inner r th-sortable" onclick="toggleFocusSort('target')">Target ${focusSortInd('target')}</div></th>${wkHead}
+    <th><div class="th-inner r th-sortable" onclick="toggleFocusSort('real')">Real ${focusSortInd('real')}</div></th>
+    <th><div class="th-inner r th-sortable" onclick="toggleFocusSort('ach')">Ach % ${focusSortInd('ach')}</div></th>
+    <th><div class="th-inner r th-sortable" onclick="toggleFocusSort('proyAkhir')">Proy. Akhir ${focusSortInd('proyAkhir')}</div></th>
+    <th><div class="th-inner r th-sortable" onclick="toggleFocusSort('status')">Proy. % ${focusSortInd('status')}</div></th>
+    <th><div class="th-inner">Status</div></th><th><div class="th-inner"></div></th>
   </tr></thead><tbody>`;
-  if(!focusSkus.length){html+=`<tr><td colspan="${nW+8}"><div class="empty">Belum ada SKU fokus. Pilih SKU dari dropdown di atas untuk pantau ketat.</div></td></tr>`;}
+  if(!focusSkus.length){html+=`<tr><td colspan="${nW+9}"><div class="empty">Belum ada SKU fokus. Pilih SKU dari dropdown di atas untuk pantau ketat.</div></td></tr>`;}
   let list=focusSkus.map(sku=>{const s=SKUS.find(x=>x.sku===sku);if(!s)return null;const c=proyCalc(sku);return {sku,s,c};}).filter(Boolean);
-  if(focusSort.col==='sku'){
-    list.sort((a,b)=>a.sku.localeCompare(b.sku)*(focusSort.dir==='asc'?1:-1));
-  } else if(focusSort.col==='status'){
+  if(focusSort.col){
     list.sort((a,b)=>{
-      const av=(a.c.target&&a.c.de>0)?a.c.fcAch:-999;
-      const bv=(b.c.target&&b.c.de>0)?b.c.fcAch:-999;
-      return (av-bv)*(focusSort.dir==='asc'?1:-1);
+      const av=focusSortValue(a,focusSort.col), bv=focusSortValue(b,focusSort.col);
+      const cmp=typeof av==='string'?av.localeCompare(bv):(av-bv);
+      return cmp*(focusSort.dir==='asc'?1:-1);
     });
   }
   list.forEach(({sku,s,c})=>{
