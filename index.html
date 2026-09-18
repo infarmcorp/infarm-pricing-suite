@@ -4860,13 +4860,13 @@ function renderHpAddonRows(){
     <tr>
       <td style="padding:4px 8px;position:relative">
         <div class="sku-search" style="margin-top:0;max-width:100%">
-          <input class="sku-search-inp" style="width:150px" type="text" placeholder="🔍 cari SKU add-on…" value="${escAttr(a.sku)}"
+          <input class="sku-search-inp" id="hpAddonSkuInp${i}" style="width:150px" type="text" placeholder="🔍 cari SKU add-on…" value="${escAttr(a.sku)}"
             oninput="hpAddonSearch(${i},this.value)" onfocus="hpAddonSearch(${i},this.value)" onblur="setTimeout(()=>hpCloseAddonDrop(${i}),180)">
           <div class="sku-drop" id="hpAddonDrop${i}"></div>
         </div>
       </td>
-      <td style="padding:4px 8px"><input class="inp editable" style="width:100px;text-align:left" type="number" value="${a.hpp}" onchange="hpAddons[${i}].hpp=parseFloat(this.value)||0;renderHpResult()" title="Otomatis keisi kalau pilih SKU yang ada — bisa juga diedit manual kalau SKU-nya belum ada di master"></td>
-      <td style="padding:4px 8px"><input class="inp editable" style="width:100px;text-align:left" type="number" value="${a.harga}" onchange="hpAddons[${i}].harga=parseFloat(this.value)||0;renderHpResult()" title="Harga add-on (boleh diedit, ini yang biasanya didiskon)"></td>
+      <td style="padding:4px 8px"><input class="inp editable" id="hpAddonHppInp${i}" style="width:100px;text-align:left" type="number" value="${a.hpp}" onchange="hpAddons[${i}].hpp=parseFloat(this.value)||0;renderHpResult()" title="Otomatis keisi kalau pilih SKU yang ada — bisa juga diedit manual kalau SKU-nya belum ada di master"></td>
+      <td style="padding:4px 8px"><input class="inp editable" id="hpAddonHargaInp${i}" style="width:100px;text-align:left" type="number" value="${a.harga}" onchange="hpAddons[${i}].harga=parseFloat(this.value)||0;renderHpResult()" title="Harga add-on (boleh diedit, ini yang biasanya didiskon)"></td>
       <td style="padding:4px 8px"><span class="del-x" onclick="hpAddons.splice(${i},1);renderHpAddonRows();renderHpResult()" title="Hapus add-on">✕</span></td>
     </tr>`).join('');
 }
@@ -4885,10 +4885,13 @@ function hpPickAddon(i,sku){
   const s=SKUS.find(x=>x.sku===sku); if(!s)return;
   const p=s.plat[hpStoreId];
   hpAddons[i].sku=sku;
-  hpAddons[i].hpp=s.hpp;
-  hpAddons[i].harga=p?p.harga:0; // starting point (harga normal di toko itu) — silakan diedit turun jadi harga add-on
+  hpAddons[i].hpp=s.hpp||0;
+  hpAddons[i].harga=p?(p.harga||0):0; // starting point (harga normal di toko itu) — silakan diedit turun jadi harga add-on
+  // update langsung field-fieldnya di DOM (tanpa render ulang seluruh tabel) biar gak ada isu timing pas klik
+  const skuInp=document.getElementById('hpAddonSkuInp'+i); if(skuInp)skuInp.value=hpAddons[i].sku;
+  const hppInp=document.getElementById('hpAddonHppInp'+i); if(hppInp)hppInp.value=hpAddons[i].hpp;
+  const hargaInp=document.getElementById('hpAddonHargaInp'+i); if(hargaInp)hargaInp.value=hpAddons[i].harga;
   hpCloseAddonDrop(i);
-  renderHpAddonRows();
   renderHpResult();
 }
 function hpKomboVarianChange(v){hpKomboVarian=v;renderHpKomboBody();renderHpResult();}
@@ -4997,8 +5000,8 @@ function renderHitungPromo(){
   const p=hpSkuObj.plat[hpStoreId];
   document.getElementById('hpHppShow').textContent=fmt(hpSkuObj.hpp);
   document.getElementById('hpHargaShow').textContent=fmt(p.harga);
-  document.getElementById('hpAfilShow').textContent=(p.afil||0)+'%';
-  document.getElementById('hpAdsShow').textContent=(p.ads||0)+'%';
+  document.getElementById('hpAfilShow').textContent=(Math.round((p.afil||0)*100)/100)+'%';
+  document.getElementById('hpAdsShow').textContent=(Math.round((p.ads||0)*100)/100)+'%';
   renderHpModeBody();
   renderHpResult();
 }
