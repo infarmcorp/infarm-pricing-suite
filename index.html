@@ -576,6 +576,10 @@ tr.row-het-bad td{background:rgba(240,97,109,.05)}
         <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="9" y1="7" x2="15" y2="7"/><circle cx="9" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="9" cy="16" r="1"/><circle cx="12" cy="16" r="1"/><circle cx="15" cy="16" r="1"/></svg>
         Hitung Harga
       </div>
+      <div class="nav-item" data-page="promo" onclick="nav('promo')">
+        <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M20.59 13.41 12 22l-9-9 8.59-8.59A2 2 0 0 1 13 4h6a2 2 0 0 1 2 2v6a2 2 0 0 1-.41 1.41Z"/><circle cx="16" cy="8" r="1.2"/></svg>
+        Hitung Promo
+      </div>
       <div class="nav-item active" data-page="kalkulator" onclick="nav('kalkulator')">
         <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="11" x2="8" y2="11"/><line x1="12" y1="11" x2="12" y2="11"/><line x1="16" y1="11" x2="16" y2="11"/><line x1="8" y1="15" x2="8" y2="15"/><line x1="12" y1="15" x2="12" y2="15"/></svg>
         Kalkulator Harga
@@ -662,6 +666,48 @@ tr.row-het-bad td{background:rgba(240,97,109,.05)}
           </div>
 
           <div id="hhResult" style="margin-top:22px"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- HITUNG PROMO (simulasi promo, tidak tersimpan) -->
+    <div class="content page" id="page-promo">
+      <div class="panel" style="max-width:820px">
+        <div class="panel-head">
+          <span class="panel-title">🎯 Hitung Promo</span>
+        </div>
+        <div class="dcard-b" style="padding:20px">
+          <div class="pg-info" style="margin-bottom:16px">Simulasi dampak Paket Diskon / Kombo Hemat / Voucher ke margin. HPP, Harga, Affiliate%, Ads% otomatis diambil dari SKU yang dipilih. Tidak tersimpan ke mana pun.</div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px">
+            <div><label class="hh-lbl">Toko</label><select class="sel" id="hpStore" style="width:100%" onchange="hpStoreChanged()"></select></div>
+            <div style="position:relative">
+              <label class="hh-lbl">SKU</label>
+              <div class="sku-search" style="margin-top:0">
+                <input class="sku-search-inp" id="hpSkuInp" placeholder="🔍 ketik kode/nama SKU…" autocomplete="off"
+                  oninput="hpSkuSearch(this.value)" onfocus="hpSkuSearch(this.value)" onblur="setTimeout(hpCloseDrop,180)">
+                <div class="sku-drop" id="hpSkuDrop"></div>
+              </div>
+            </div>
+          </div>
+
+          <div id="hpSkuInfo" style="display:none">
+            <div class="kpi-row" style="grid-template-columns:repeat(4,1fr);margin-bottom:18px">
+              <div class="kpi kpi-sm a-blue"><div class="kpi-lbl">HPP</div><div class="kpi-val" id="hpHppShow">-</div></div>
+              <div class="kpi kpi-sm a-blue"><div class="kpi-lbl">Harga Normal</div><div class="kpi-val" id="hpHargaShow">-</div></div>
+              <div class="kpi kpi-sm a-amber"><div class="kpi-lbl">Affiliate %</div><div class="kpi-val" id="hpAfilShow">-</div></div>
+              <div class="kpi kpi-sm a-amber"><div class="kpi-lbl">Ads %</div><div class="kpi-val" id="hpAdsShow">-</div></div>
+            </div>
+
+            <div style="display:flex;gap:6px;margin-bottom:16px" id="hpModeTabs">
+              <div class="store-tab active" data-mode="diskon" onclick="hpSwitchMode('diskon')">📦 Paket Diskon</div>
+              <div class="store-tab" data-mode="kombo" onclick="hpSwitchMode('kombo')">🎁 Kombo Hemat</div>
+              <div class="store-tab" data-mode="voucher" onclick="hpSwitchMode('voucher')">🎟️ Voucher</div>
+            </div>
+
+            <div id="hpModeBody"></div>
+            <div id="hpResult" style="margin-top:20px"></div>
+          </div>
         </div>
       </div>
     </div>
@@ -4657,6 +4703,7 @@ const TITLES={
   tugas:['Tugas','Monitoring deadline & PIC'],
   kalkulator:['Kalkulator Harga','Multi-platform per SKU'],
   hitung:['Hitung Harga','Simulasi cepat, tidak tersimpan'],
+  promo:['Hitung Promo','Dampak promo ke margin, tidak tersimpan'],
   base:['Base Data SKU','Sumber semua kalkulasi'],
   users:['Kelola User','Atur akses tim'],
   riwayat:['Riwayat','Log perubahan data']
@@ -4727,6 +4774,204 @@ function renderHitungHarga(){
     ${suggestedNote}
   `;
 }
+// ═══════════════════════ HITUNG PROMO (simulasi promo, tidak tersimpan) ═══════════════════════
+let hpStoreId=null, hpSkuObj=null, hpMode='diskon';
+let hpTiers=[{qty:2,tipe:'persen',nilai:10}];
+let hpKomboVarian='addon';
+let hpAddons=[{sku:'',hpp:0,harga:0}];
+let hpGift={minBelanja:0,hppHadiah:0};
+let hpVoucher={tipe:'nominal',nilai:0,kuota:0};
+
+function initHitungPromo(){
+  populateStoreSelect('hpStore');
+  hpStoreId=document.getElementById('hpStore').value;
+  hpSkuObj=null;
+  document.getElementById('hpSkuInp').value='';
+  document.getElementById('hpSkuInfo').style.display='none';
+  hpTiers=[{qty:2,tipe:'persen',nilai:10}];
+  hpAddons=[{sku:'',hpp:0,harga:0}];
+  hpGift={minBelanja:0,hppHadiah:0};
+  hpVoucher={tipe:'nominal',nilai:0,kuota:0};
+  hpMode='diskon';
+  document.querySelectorAll('#hpModeTabs .store-tab').forEach(el=>el.classList.toggle('active',el.dataset.mode==='diskon'));
+}
+function hpStoreChanged(){
+  hpStoreId=document.getElementById('hpStore').value;
+  hpSkuObj=null;
+  document.getElementById('hpSkuInp').value='';
+  document.getElementById('hpSkuInfo').style.display='none';
+}
+function hpSkuSearch(q){
+  const drop=document.getElementById('hpSkuDrop'); if(!drop)return;
+  q=(q||'').toLowerCase().trim();
+  let results=SKUS.filter(s=>s.plat[hpStoreId]&&s.plat[hpStoreId].harga>0);
+  if(q)results=results.filter(s=>(s.sku+' '+s.kat).toLowerCase().includes(q));
+  results=results.slice(0,50);
+  if(!results.length){drop.innerHTML='<div class="sku-drop-empty">Tidak ada SKU berharga di toko ini</div>';drop.classList.add('open');return;}
+  drop.innerHTML=results.map(s=>`<div class="sku-opt" onmousedown="hpPickSku('${s.sku}')"><span class="sku-opt-code">${s.sku}</span><span class="sku-opt-kat">${s.kat}</span></div>`).join('');
+  drop.classList.add('open');
+}
+function hpCloseDrop(){const d=document.getElementById('hpSkuDrop');if(d)d.classList.remove('open');}
+function hpPickSku(sku){
+  hpSkuObj=SKUS.find(s=>s.sku===sku);
+  document.getElementById('hpSkuInp').value=sku;
+  hpCloseDrop();
+  renderHitungPromo();
+}
+function hpSwitchMode(m){
+  hpMode=m;
+  document.querySelectorAll('#hpModeTabs .store-tab').forEach(el=>el.classList.toggle('active',el.dataset.mode===m));
+  renderHitungPromo();
+}
+function hpBaseCalc(hargaEfektif,hppOverride){
+  const store=STORES[hpStoreId], plat=store.platform;
+  const p=hpSkuObj.plat[hpStoreId];
+  return calc({hpp:hppOverride!=null?hppOverride:hpSkuObj.hpp,kat:hpSkuObj.kat,berat:hpSkuObj.berat,zone:hpSkuObj.zone,minbeli:p.minbeli||1,harga:hargaEfektif,tprofit:0,afil:p.afil||0,ads:p.ads||0},plat);
+}
+function hpTierHargaEfektif(t){
+  const p=hpSkuObj.plat[hpStoreId];
+  if(t.tipe==='persen')return p.harga*(1-(t.nilai||0)/100);
+  if(t.tipe==='nominal')return Math.max(p.harga-(t.nilai||0),0);
+  if(t.tipe==='paket')return t.qty>0?(t.nilai||0)/t.qty:0;
+  return p.harga;
+}
+function hpAddTier(){hpTiers.push({qty:(hpTiers[hpTiers.length-1]?.qty||1)+1,tipe:'persen',nilai:0});renderHpTierRows();renderHpResult();}
+function renderHpTierRows(){
+  const tb=document.getElementById('hpTierRows'); if(!tb)return;
+  tb.innerHTML=hpTiers.map((t,i)=>`
+    <tr>
+      <td style="padding:4px 8px"><input class="inp editable inp-xs" type="number" value="${t.qty}" onchange="hpTiers[${i}].qty=parseFloat(this.value)||1;renderHpResult()"></td>
+      <td style="padding:4px 8px"><select class="sel" style="width:150px" onchange="hpTiers[${i}].tipe=this.value;renderHpResult()">
+        <option value="persen" ${t.tipe==='persen'?'selected':''}>Persentase %</option>
+        <option value="nominal" ${t.tipe==='nominal'?'selected':''}>Nominal Rp</option>
+        <option value="paket" ${t.tipe==='paket'?'selected':''}>Harga Paket Total</option>
+      </select></td>
+      <td style="padding:4px 8px"><input class="inp editable" style="width:110px;text-align:left" type="number" value="${t.nilai}" onchange="hpTiers[${i}].nilai=parseFloat(this.value)||0;renderHpResult()"></td>
+      <td style="padding:4px 8px"><span class="del-x" onclick="hpTiers.splice(${i},1);renderHpTierRows();renderHpResult()" title="Hapus tingkatan">✕</span></td>
+    </tr>`).join('');
+}
+function hpAddAddon(){hpAddons.push({sku:'',hpp:0,harga:0});renderHpAddonRows();renderHpResult();}
+function renderHpAddonRows(){
+  const tb=document.getElementById('hpAddonRows'); if(!tb)return;
+  tb.innerHTML=hpAddons.map((a,i)=>`
+    <tr>
+      <td style="padding:4px 8px"><input class="inp editable inp-left" style="width:150px" type="text" value="${escAttr(a.sku)}" placeholder="nama produk add-on" onchange="hpAddons[${i}].sku=this.value"></td>
+      <td style="padding:4px 8px"><input class="inp editable" style="width:100px;text-align:left" type="number" value="${a.hpp}" onchange="hpAddons[${i}].hpp=parseFloat(this.value)||0;renderHpResult()"></td>
+      <td style="padding:4px 8px"><input class="inp editable" style="width:100px;text-align:left" type="number" value="${a.harga}" onchange="hpAddons[${i}].harga=parseFloat(this.value)||0;renderHpResult()"></td>
+      <td style="padding:4px 8px"><span class="del-x" onclick="hpAddons.splice(${i},1);renderHpAddonRows();renderHpResult()" title="Hapus add-on">✕</span></td>
+    </tr>`).join('');
+}
+function hpKomboVarianChange(v){hpKomboVarian=v;renderHpKomboBody();renderHpResult();}
+function hpVoucherChange(){
+  hpVoucher.tipe=document.getElementById('hpVoucherTipe').value;
+  hpVoucher.nilai=parseFloat(document.getElementById('hpVoucherNilai').value)||0;
+  hpVoucher.kuota=parseFloat(document.getElementById('hpVoucherKuota').value)||0;
+  renderHpResult();
+}
+function renderHpModeBody(){
+  const el=document.getElementById('hpModeBody'); if(!el)return;
+  if(hpMode==='diskon'){
+    el.innerHTML=`<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11.5px">
+        <thead><tr style="text-align:left;color:var(--txt-3);text-transform:uppercase;font-size:10px">
+          <th style="padding:6px 8px">Qty Min</th><th style="padding:6px 8px">Tipe</th><th style="padding:6px 8px">Nilai</th><th style="padding:6px 8px"></th>
+        </tr></thead><tbody id="hpTierRows"></tbody></table></div>
+      <button class="tbtn" style="margin-top:8px" onclick="hpAddTier()">+ Tambah Tingkatan</button>`;
+    renderHpTierRows();
+  } else if(hpMode==='kombo'){
+    el.innerHTML=`<div style="display:flex;gap:16px;margin-bottom:14px;font-size:12px">
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="radio" name="hpKomboVarian" value="addon" ${hpKomboVarian==='addon'?'checked':''} onchange="hpKomboVarianChange('addon')"> Add-on Deal</label>
+        <label style="display:flex;align-items:center;gap:6px;cursor:pointer"><input type="radio" name="hpKomboVarian" value="gift" ${hpKomboVarian==='gift'?'checked':''} onchange="hpKomboVarianChange('gift')"> Hadiah dengan Min. Belanja</label>
+      </div><div id="hpKomboBody"></div>`;
+    renderHpKomboBody();
+  } else if(hpMode==='voucher'){
+    el.innerHTML=`<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px">
+        <div><label class="hh-lbl">Tipe Voucher</label><select class="sel" id="hpVoucherTipe" style="width:100%" onchange="hpVoucherChange()">
+          <option value="nominal" ${hpVoucher.tipe==='nominal'?'selected':''}>Diskon Nominal (Rp)</option>
+          <option value="persen" ${hpVoucher.tipe==='persen'?'selected':''}>Diskon Persentase (%)</option>
+          <option value="koin" ${hpVoucher.tipe==='koin'?'selected':''}>Cashback Koin (Rp)</option>
+        </select></div>
+        <div><label class="hh-lbl">Nilai</label><input class="inp editable" style="width:100%;text-align:left" id="hpVoucherNilai" type="number" value="${hpVoucher.nilai}" oninput="hpVoucherChange()"></div>
+        <div><label class="hh-lbl">Kuota Pemakaian (opsional)</label><input class="inp editable" style="width:100%;text-align:left" id="hpVoucherKuota" type="number" value="${hpVoucher.kuota}" oninput="hpVoucherChange()"></div>
+      </div>`;
+  }
+}
+function renderHpKomboBody(){
+  const el=document.getElementById('hpKomboBody'); if(!el)return;
+  if(hpKomboVarian==='addon'){
+    el.innerHTML=`<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11.5px">
+        <thead><tr style="text-align:left;color:var(--txt-3);text-transform:uppercase;font-size:10px">
+          <th style="padding:6px 8px">Produk Add-on</th><th style="padding:6px 8px">HPP</th><th style="padding:6px 8px">Harga Add-on</th><th></th>
+        </tr></thead><tbody id="hpAddonRows"></tbody></table></div>
+      <button class="tbtn" style="margin-top:8px" onclick="hpAddAddon()">+ Tambah Produk Add-on</button>`;
+    renderHpAddonRows();
+  } else {
+    el.innerHTML=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        <div><label class="hh-lbl">Minimal Belanja (Rp)</label><input class="inp editable" style="width:100%;text-align:left" id="hpGiftMin" type="number" value="${hpGift.minBelanja}" oninput="hpGift.minBelanja=parseFloat(this.value)||0;renderHpResult()"></div>
+        <div><label class="hh-lbl">HPP Barang Hadiah (Rp)</label><input class="inp editable" style="width:100%;text-align:left" id="hpGiftHpp" type="number" value="${hpGift.hppHadiah}" oninput="hpGift.hppHadiah=parseFloat(this.value)||0;renderHpResult()"></div>
+      </div>
+      <div class="pg-info" style="margin-top:10px">⚠️ Sesuai aturan Shopee: kalau pilih varian ini, Paket Diskon gak bisa aktif bareng di promo yang sama.</div>`;
+  }
+}
+function renderHpResult(){
+  const resEl=document.getElementById('hpResult'); if(!resEl||!hpSkuObj)return;
+  const p=hpSkuObj.plat[hpStoreId];
+  const cNormal=hpBaseCalc(p.harga);
+
+  if(hpMode==='diskon'){
+    if(!hpTiers.length){resEl.innerHTML='<div class="empty">Tambah minimal 1 tingkatan.</div>';return;}
+    const rows=hpTiers.map(t=>{const he=hpTierHargaEfektif(t);return {qty:t.qty,he,c:hpBaseCalc(he)};});
+    resEl.innerHTML=`<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11.5px">
+        <thead><tr style="text-align:left;color:var(--txt-3);text-transform:uppercase;font-size:10px"><th style="padding:6px 8px"></th><th style="padding:6px 8px">Harga Efektif/unit</th><th style="padding:6px 8px">GM %</th><th style="padding:6px 8px">Net Bersih %</th></tr></thead>
+        <tbody>
+        <tr style="background:rgba(255,255,255,.03)"><td style="padding:6px 8px;font-weight:600">Normal</td><td style="padding:6px 8px">${fmt(p.harga)}</td><td style="padding:6px 8px">${pct(cNormal.gm)}</td><td style="padding:6px 8px">${pct(cNormal.net)}</td></tr>
+        ${rows.map(r=>`<tr><td style="padding:6px 8px">Beli ${r.qty}</td><td style="padding:6px 8px">${fmt(r.he)}</td><td style="padding:6px 8px">${pct(r.c.gm)}</td><td style="padding:6px 8px">${pct(r.c.net)}</td></tr>`).join('')}
+        </tbody></table></div>`;
+  } else if(hpMode==='kombo'){
+    if(hpKomboVarian==='addon'){
+      let totalHarga=p.harga, totalProfit=cNormal.net*p.harga;
+      hpAddons.forEach(a=>{if(a.harga>0){const ac=hpBaseCalc(a.harga,a.hpp);totalHarga+=a.harga;totalProfit+=ac.net*a.harga;}});
+      const combinedNet=totalHarga>0?totalProfit/totalHarga:0;
+      resEl.innerHTML=`<div class="kpi-row" style="grid-template-columns:repeat(3,1fr)">
+          <div class="kpi kpi-sm a-blue"><div class="kpi-lbl">Net Bersih Produk Utama</div><div class="kpi-val">${pct(cNormal.net)}</div></div>
+          <div class="kpi kpi-sm a-amber"><div class="kpi-lbl">Total Harga (1 keranjang)</div><div class="kpi-val">${fmt(totalHarga)}</div></div>
+          <div class="kpi kpi-sm a-green"><div class="kpi-lbl">Net Bersih Gabungan</div><div class="kpi-val">${pct(combinedNet)}</div></div>
+        </div>`;
+    } else {
+      const minBelanja=hpGift.minBelanja||0, hppHadiah=hpGift.hppHadiah||0;
+      if(minBelanja<=0){resEl.innerHTML='<div class="empty">Isi Minimal Belanja dulu.</div>';return;}
+      const marginSebelum=cNormal.net, marginSesudah=marginSebelum-(hppHadiah/minBelanja);
+      resEl.innerHTML=`<div class="kpi-row" style="grid-template-columns:repeat(2,1fr)">
+          <div class="kpi kpi-sm a-blue"><div class="kpi-lbl">Net Bersih Sebelum Hadiah</div><div class="kpi-val">${pct(marginSebelum)}</div><div class="kpi-sub">asumsi transaksi = Rp${fmt(minBelanja)}</div></div>
+          <div class="kpi kpi-sm a-red"><div class="kpi-lbl">Net Bersih Sesudah Hadiah</div><div class="kpi-val">${pct(marginSesudah)}</div><div class="kpi-sub">HPP hadiah Rp${fmt(hppHadiah)} dibagi rata ke transaksi</div></div>
+        </div>`;
+    }
+  } else if(hpMode==='voucher'){
+    let he=p.harga, biayaPerTx=0;
+    if(hpVoucher.tipe==='nominal'){he=Math.max(p.harga-hpVoucher.nilai,0);biayaPerTx=hpVoucher.nilai;}
+    else if(hpVoucher.tipe==='persen'){he=p.harga*(1-(hpVoucher.nilai||0)/100);biayaPerTx=p.harga-he;}
+    else {biayaPerTx=hpVoucher.nilai;}
+    const cVoucher=hpVoucher.tipe==='koin'?hpBaseCalc(Math.max(p.harga-hpVoucher.nilai,0)):hpBaseCalc(he);
+    const totalBudget=hpVoucher.kuota>0?biayaPerTx*hpVoucher.kuota:null;
+    resEl.innerHTML=`<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11.5px">
+        <thead><tr style="text-align:left;color:var(--txt-3);text-transform:uppercase;font-size:10px"><th style="padding:6px 8px"></th><th style="padding:6px 8px">Harga</th><th style="padding:6px 8px">GM %</th><th style="padding:6px 8px">Net Bersih %</th></tr></thead>
+        <tbody>
+        <tr style="background:rgba(255,255,255,.03)"><td style="padding:6px 8px;font-weight:600">Normal</td><td style="padding:6px 8px">${fmt(p.harga)}</td><td style="padding:6px 8px">${pct(cNormal.gm)}</td><td style="padding:6px 8px">${pct(cNormal.net)}</td></tr>
+        <tr><td style="padding:6px 8px;font-weight:600">+ Voucher</td><td style="padding:6px 8px">${fmt(hpVoucher.tipe==='koin'?p.harga:he)}${hpVoucher.tipe==='koin'?' <span style="color:var(--txt-3);font-size:10px">(bayar tetap + koin)</span>':''}</td><td style="padding:6px 8px">${pct(cVoucher.gm)}</td><td style="padding:6px 8px">${pct(cVoucher.net)}</td></tr>
+        </tbody></table></div>
+      ${totalBudget!=null?`<div class="pg-info" style="margin-top:10px">💰 Estimasi Total Biaya Promo: <b>${fmt(totalBudget)}</b> (dari kuota ${hpVoucher.kuota} pemakaian)</div>`:''}`;
+  }
+}
+function renderHitungPromo(){
+  if(!hpSkuObj){document.getElementById('hpSkuInfo').style.display='none';return;}
+  document.getElementById('hpSkuInfo').style.display='';
+  const p=hpSkuObj.plat[hpStoreId];
+  document.getElementById('hpHppShow').textContent=fmt(hpSkuObj.hpp);
+  document.getElementById('hpHargaShow').textContent=fmt(p.harga);
+  document.getElementById('hpAfilShow').textContent=(p.afil||0)+'%';
+  document.getElementById('hpAdsShow').textContent=(p.ads||0)+'%';
+  renderHpModeBody();
+  renderHpResult();
+}
 function nav(p){
   activePage=p;
   document.querySelectorAll('.page').forEach(el=>el.classList.remove('active'));
@@ -4743,6 +4988,7 @@ function nav(p){
   if(p==='hetaudit')renderHetAudit();
   if(p==='tugas')loadTasks();
   if(p==='hitung'&&typeof initHitungHarga==='function')initHitungHarga();
+  if(p==='promo'&&typeof initHitungPromo==='function')initHitungPromo();
   if(p==='users')loadUsers();
   if(p==='riwayat')loadLogs();
   if(typeof applyPerms==='function'&&currentUser)applyPerms();
