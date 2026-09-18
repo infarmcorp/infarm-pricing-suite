@@ -475,6 +475,9 @@ tr.row-het-bad td{background:rgba(240,97,109,.05)}
 .map-x{cursor:pointer;opacity:.7}.map-x:hover{opacity:1}
 /* searchable SKU dropdown */
 .sku-search{position:relative;margin-top:6px;max-width:260px}
+.sku-search-lg{max-width:100%}
+.sku-drop.sku-drop-lg{max-height:340px}
+.sku-opt.sku-opt-lg{padding:10px 14px;font-size:12px}
 .sku-search-inp{width:100%;border:1px solid var(--blue);background:var(--bg);border-radius:7px;padding:7px 10px;font-size:11px;color:var(--txt);font-family:'Inter',sans-serif}
 .sku-search-inp:focus{outline:none;box-shadow:0 0 0 2px var(--blue-glow)}
 .sku-drop{position:absolute;top:calc(100% + 4px);left:0;right:0;background:var(--bg-3);border:1px solid var(--line);border-radius:9px;box-shadow:0 12px 36px rgba(0,0,0,.5);max-height:260px;overflow-y:auto;z-index:120;display:none}
@@ -679,14 +682,14 @@ tr.row-het-bad td{background:rgba(240,97,109,.05)}
         <div class="dcard-b" style="padding:20px">
           <div class="pg-info" style="margin-bottom:16px">Simulasi dampak Paket Diskon / Kombo Hemat / Voucher ke margin. HPP, Harga, Affiliate%, Ads% otomatis diambil dari SKU yang dipilih. Tidak tersimpan ke mana pun.</div>
 
-          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px">
+          <div style="display:grid;grid-template-columns:1fr 1.6fr;gap:14px;margin-bottom:16px">
             <div><label class="hh-lbl">Toko</label><select class="sel" id="hpStore" style="width:100%" onchange="hpStoreChanged()"></select></div>
             <div style="position:relative">
               <label class="hh-lbl">SKU</label>
-              <div class="sku-search" style="margin-top:0">
+              <div class="sku-search sku-search-lg" style="margin-top:0">
                 <input class="sku-search-inp" id="hpSkuInp" placeholder="🔍 ketik kode/nama SKU…" autocomplete="off"
                   oninput="hpSkuSearch(this.value)" onfocus="hpSkuSearch(this.value)" onblur="setTimeout(hpCloseDrop,180)">
-                <div class="sku-drop" id="hpSkuDrop"></div>
+                <div class="sku-drop sku-drop-lg" id="hpSkuDrop"></div>
               </div>
             </div>
           </div>
@@ -4808,7 +4811,7 @@ function hpSkuSearch(q){
   if(q)results=results.filter(s=>(s.sku+' '+s.kat).toLowerCase().includes(q));
   results=results.slice(0,50);
   if(!results.length){drop.innerHTML='<div class="sku-drop-empty">Tidak ada SKU berharga di toko ini</div>';drop.classList.add('open');return;}
-  drop.innerHTML=results.map(s=>`<div class="sku-opt" onmousedown="hpPickSku('${s.sku}')"><span class="sku-opt-code">${s.sku}</span><span class="sku-opt-kat">${s.kat}</span></div>`).join('');
+  drop.innerHTML=results.map(s=>`<div class="sku-opt sku-opt-lg" onmousedown="hpPickSku('${s.sku}')"><span class="sku-opt-code">${s.sku}</span><span class="sku-opt-kat">${s.kat}</span></div>`).join('');
   drop.classList.add('open');
 }
 function hpCloseDrop(){const d=document.getElementById('hpSkuDrop');if(d)d.classList.remove('open');}
@@ -4855,11 +4858,38 @@ function renderHpAddonRows(){
   const tb=document.getElementById('hpAddonRows'); if(!tb)return;
   tb.innerHTML=hpAddons.map((a,i)=>`
     <tr>
-      <td style="padding:4px 8px"><input class="inp editable inp-left" style="width:150px" type="text" value="${escAttr(a.sku)}" placeholder="nama produk add-on" onchange="hpAddons[${i}].sku=this.value"></td>
-      <td style="padding:4px 8px"><input class="inp editable" style="width:100px;text-align:left" type="number" value="${a.hpp}" onchange="hpAddons[${i}].hpp=parseFloat(this.value)||0;renderHpResult()"></td>
-      <td style="padding:4px 8px"><input class="inp editable" style="width:100px;text-align:left" type="number" value="${a.harga}" onchange="hpAddons[${i}].harga=parseFloat(this.value)||0;renderHpResult()"></td>
+      <td style="padding:4px 8px;position:relative">
+        <div class="sku-search" style="margin-top:0;max-width:100%">
+          <input class="sku-search-inp" style="width:150px" type="text" placeholder="🔍 cari SKU add-on…" value="${escAttr(a.sku)}"
+            oninput="hpAddonSearch(${i},this.value)" onfocus="hpAddonSearch(${i},this.value)" onblur="setTimeout(()=>hpCloseAddonDrop(${i}),180)">
+          <div class="sku-drop" id="hpAddonDrop${i}"></div>
+        </div>
+      </td>
+      <td style="padding:4px 8px"><input class="inp editable" style="width:100px;text-align:left" type="number" value="${a.hpp}" onchange="hpAddons[${i}].hpp=parseFloat(this.value)||0;renderHpResult()" title="Otomatis keisi kalau pilih SKU yang ada — bisa juga diedit manual kalau SKU-nya belum ada di master"></td>
+      <td style="padding:4px 8px"><input class="inp editable" style="width:100px;text-align:left" type="number" value="${a.harga}" onchange="hpAddons[${i}].harga=parseFloat(this.value)||0;renderHpResult()" title="Harga add-on (boleh diedit, ini yang biasanya didiskon)"></td>
       <td style="padding:4px 8px"><span class="del-x" onclick="hpAddons.splice(${i},1);renderHpAddonRows();renderHpResult()" title="Hapus add-on">✕</span></td>
     </tr>`).join('');
+}
+function hpAddonSearch(i,q){
+  const drop=document.getElementById('hpAddonDrop'+i); if(!drop)return;
+  q=(q||'').toLowerCase().trim();
+  let results=SKUS.filter(s=>s.plat[hpStoreId]&&s.plat[hpStoreId].harga>0);
+  if(q)results=results.filter(s=>(s.sku+' '+s.kat).toLowerCase().includes(q));
+  results=results.slice(0,50);
+  if(!results.length){drop.innerHTML='<div class="sku-drop-empty">Tidak ada SKU cocok di toko ini</div>';drop.classList.add('open');return;}
+  drop.innerHTML=results.map(s=>`<div class="sku-opt" onmousedown="hpPickAddon(${i},'${s.sku}')"><span class="sku-opt-code">${s.sku}</span><span class="sku-opt-kat">${s.kat}</span></div>`).join('');
+  drop.classList.add('open');
+}
+function hpCloseAddonDrop(i){const d=document.getElementById('hpAddonDrop'+i);if(d)d.classList.remove('open');}
+function hpPickAddon(i,sku){
+  const s=SKUS.find(x=>x.sku===sku); if(!s)return;
+  const p=s.plat[hpStoreId];
+  hpAddons[i].sku=sku;
+  hpAddons[i].hpp=s.hpp;
+  hpAddons[i].harga=p?p.harga:0; // starting point (harga normal di toko itu) — silakan diedit turun jadi harga add-on
+  hpCloseAddonDrop(i);
+  renderHpAddonRows();
+  renderHpResult();
 }
 function hpKomboVarianChange(v){hpKomboVarian=v;renderHpKomboBody();renderHpResult();}
 function hpVoucherChange(){
