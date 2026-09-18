@@ -1136,10 +1136,30 @@ tr.row-het-bad td{background:rgba(240,97,109,.05)}
 
     <!-- BASE DATA -->
     <div class="content page" id="page-base">
+      <div class="upload-guide" id="baseHppUploadGuide" style="display:none">
+        <div class="ug-head">
+          <span class="ug-title">📤 Update HPP Massal</span>
+          <span class="ug-close" onclick="closeBaseHppUpload()">✕</span>
+        </div>
+        <div class="ug-body">
+          <div class="ug-step" style="border:none">
+            <div class="ug-content">
+              <div class="ug-step-title">Format file</div>
+              <div class="ug-step-desc">Kolom wajib: <b>SKU</b>, <b>HPP</b>. Kolom Kategori opsional (kalau diisi, ikut ke-update). HPP ini shared ke semua toko — gak perlu pilih platform/toko.</div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+                <button class="tbtn" onclick="downloadBaseHppTemplate()">⤓ Download Template</button>
+                <label class="tbtn" style="cursor:pointer">📁 Pilih File<input type="file" accept=".xlsx,.xls" style="display:none" onchange="handleBaseHppUpload(event)"></label>
+              </div>
+              <div class="ug-step-desc" style="margin-top:10px">SKU yang gak ketemu di master akan dilewati (dilaporkan di akhir), bukan otomatis ditambah — supaya gak nambah SKU baru gak sengaja lewat sini.</div>
+            </div>
+          </div>
+        </div>
+      </div>
       <div class="panel">
         <div class="panel-head">
           <span class="panel-title">Base Data SKU</span>
           <div class="panel-actions">
+            <button class="tbtn" onclick="openBaseHppUpload()">↑ Update HPP Massal</button>
             <button class="tbtn" onclick="downloadLegacyReference()" title="Data harga Shopee Star & TikTok Powershop sebelum restrukturisasi per-toko — dipakai sebagai referensi menyiapkan file Upload Massal per toko">⤓ Referensi Harga Lama (Star/PS)</button>
           </div>
           <span class="pg-info" id="baseNote"></span>
@@ -2793,6 +2813,7 @@ function delSku(i){
 }
 function upd(i,f,v){const old=SKUS[i].plat[currentStore][f];snapshot('ubah '+f+' '+SKUS[i].sku);SKUS[i].plat[currentStore][f]=parseFloat(v)||0;logChange('Ubah '+f.toUpperCase(),SKUS[i].sku+' ('+(STORES[currentStore]?STORES[currentStore].name:currentStore)+')',old,SKUS[i].plat[currentStore][f]);preserveKalkOrder=true;renderKalkulator();preserveKalkOrder=false;saveSku(SKUS[i].sku);}
 function updBase(i,f,v){const old=SKUS[i][f];snapshot('ubah '+f+' '+SKUS[i].sku);SKUS[i][f]=(f==='zone')?v:(parseFloat(v)||0);logChange('Ubah '+f.toUpperCase(),SKUS[i].sku,old,SKUS[i][f]);preserveKalkOrder=true;renderKalkulator();preserveKalkOrder=false;saveSku(SKUS[i].sku);}
+function updBaseHpp(i,v){updBase(i,'hpp',v);renderBase();}
 function updMasterText(i,f,v){
   const s=SKUS[i]; if(!s)return;
   const old=s[f];
@@ -3774,8 +3795,10 @@ function renderBase(){
   const shown=rows.length; rows=rows.slice(0,200);
   let html=tfHeader('base')+'<tbody>';
   rows.forEach(s=>{
+    const i=SKUS.indexOf(s);
     html+=`<tr><td class="td-sku">${s.sku}</td><td><span class="cat">${s.kat}</span></td><td><span class="tipe ${tipeC(s.tipe)}">${s.tipe}</span></td>
-      <td class="num">${fmt(s.hpp)}</td><td class="num">${s.berat}g</td><td><span class="tier-badge">${beratToTier(s.berat)}</span></td>
+      <td class="num"><input class="inp editable inp-s" type="number" value="${s.hpp}" onchange="updBaseHpp(${i},this.value)" title="HPP shared \u2014 mengubah di sini otomatis berlaku ke semua toko"></td>
+      <td class="num">${s.berat}g</td><td><span class="tier-badge">${beratToTier(s.berat)}</span></td>
       <td style="font-size:10px;color:var(--txt-2)">${s.zone}</td>
       <td class="num">${fmt(skuAvgForPlatform(s,'shopee_mall'))}</td><td class="num">${fmt(skuAvgForPlatform(s,'shopee_star'))}</td>
       <td class="num">${fmt(skuAvgForPlatform(s,'tiktok_mall'))}</td><td class="num">${fmt(skuAvgForPlatform(s,'tiktok_powershop'))}</td></tr>`;
@@ -3787,6 +3810,61 @@ function renderBase(){
   if(bn)bn.textContent=shown>200?`Menampilkan 200 dari ${shown} SKU (hasil filter). Pakai filter kolom untuk persempit.`:`${shown} SKU`;
 }
 
+function openBaseHppUpload(){document.getElementById('baseHppUploadGuide').style.display='block';}
+function closeBaseHppUpload(){document.getElementById('baseHppUploadGuide').style.display='none';}
+function downloadBaseHppTemplate(){
+  const ex=SKUS[0]||{sku:'BAG-PLANTER-BLT150',kat:'BAG',hpp:29000};
+  const aoa=[['SKU','Kategori','HPP','Keterangan'],
+    [ex.sku,ex.kat,ex.hpp,'← CONTOH. HPP ini shared ke semua toko. Kolom Kategori opsional (kosongkan kalau gak mau diubah). Hapus baris ini sebelum upload.'],
+    [' ']];
+  const ws=XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols']=[{wch:24},{wch:14},{wch:12},{wch:75}];
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Update HPP');
+  XLSX.writeFile(wb,'Template_UpdateHPP_Massal.xlsx');
+}
+function handleBaseHppUpload(ev){
+  const file=ev.target.files[0]; if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try{
+      const wb=XLSX.read(e.target.result,{type:'array'});
+      const rows=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]],{header:1});
+      applyBaseHppUpload(rows);
+    }catch(err){alert('Gagal membaca file: '+err.message);}
+  };
+  reader.readAsArrayBuffer(file);
+  ev.target.value='';
+}
+function applyBaseHppUpload(rows){
+  if(!rows||rows.length<2){alert('File kosong / format salah.');return;}
+  const H=rows[0].map(h=>String(h||'').trim().toUpperCase());
+  const iSku=H.indexOf('SKU'), iHpp=H.indexOf('HPP'), iKat=H.indexOf('KATEGORI');
+  if(iSku<0||iHpp<0){alert('Kolom "SKU" dan "HPP" wajib ada di file.');return;}
+  const skuMap={}; SKUS.forEach((s,i)=>skuMap[s.sku]=i);
+  let updated=0; const notFound=[];
+  snapshot(`update HPP massal (${rows.length-1} baris)`);
+  for(let r=1;r<rows.length;r++){
+    const row=rows[r]; if(!row||!row[iSku])continue;
+    const sku=String(row[iSku]).trim(); if(!sku)continue;
+    const idx=skuMap[sku];
+    if(idx===undefined){notFound.push(sku);continue;}
+    const hppVal=parseFloat(row[iHpp]);
+    if(!isNaN(hppVal)){
+      const old=SKUS[idx].hpp;
+      SKUS[idx].hpp=hppVal;
+      logChange('Ubah HPP (massal)',sku,old,hppVal);
+    }
+    if(iKat>=0&&row[iKat]){SKUS[idx].kat=String(row[iKat]).trim().toUpperCase();}
+    saveSku(sku);
+    updated++;
+  }
+  let msg=`Update HPP Massal selesai.\nDiupdate: ${updated} SKU`;
+  if(notFound.length)msg+=`\n\n⚠️ ${notFound.length} SKU tidak ketemu di master (dilewati):\n- `+notFound.slice(0,8).join('\n- ')+(notFound.length>8?`\n…dan ${notFound.length-8} lagi`:'');
+  alert(msg);
+  closeBaseHppUpload();
+  renderBase(); renderKalkulator();
+}
 function downloadLegacyReference(){
   const rows=SKUS.filter(s=>s._legacyStar||s._legacyPowershop).map(s=>({
     SKU:s.sku,Kategori:s.kat,HPP:s.hpp,
