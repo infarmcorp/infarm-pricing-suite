@@ -4972,13 +4972,14 @@ function renderHpResult(){
         </tbody></table></div>`;
   } else if(hpMode==='kombo'){
     if(hpKomboVarian==='addon'){
-      let totalHarga=p.harga, totalProfit=cNormal.net*p.harga;
-      hpAddons.forEach(a=>{if(a.harga>0){const ac=hpBaseCalc(a.harga,a.hpp);totalHarga+=a.harga;totalProfit+=ac.net*a.harga;}});
-      const combinedNet=totalHarga>0?totalProfit/totalHarga:0;
+      // digabung jadi 1 keranjang -> calc() dipanggil SEKALI (biaya tetap/logistik/PPN/OPEX gak dobel per item)
+      let totalHarga=p.harga, totalHpp=hpSkuObj.hpp;
+      hpAddons.forEach(a=>{ totalHarga+=(a.harga||0); totalHpp+=(a.hpp||0); }); // termasuk yang harga 0 (gratis) — HPP-nya tetap jadi biaya
+      const cCombined=hpBaseCalc(totalHarga,totalHpp);
       resEl.innerHTML=`<div class="kpi-row" style="grid-template-columns:repeat(3,1fr)">
-          <div class="kpi kpi-sm a-blue"><div class="kpi-lbl">Net Bersih Produk Utama</div><div class="kpi-val">${pct(cNormal.net)}</div></div>
+          <div class="kpi kpi-sm a-blue"><div class="kpi-lbl">Net Bersih Produk Utama (sendiri)</div><div class="kpi-val">${pct(cNormal.net)}</div></div>
           <div class="kpi kpi-sm a-amber"><div class="kpi-lbl">Total Harga (1 keranjang)</div><div class="kpi-val">${fmt(totalHarga)}</div></div>
-          <div class="kpi kpi-sm a-green"><div class="kpi-lbl">Net Bersih Gabungan</div><div class="kpi-val">${pct(combinedNet)}</div></div>
+          <div class="kpi kpi-sm a-green"><div class="kpi-lbl">Net Bersih Gabungan</div><div class="kpi-val">${pct(cCombined.net)}</div></div>
         </div>`;
     } else {
       const minBelanja=hpGift.minBelanja||0, hppHadiah=hpGift.hppHadiah||0;
