@@ -154,6 +154,14 @@ body::after{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;opac
 .kpi-sub{font-size:10px;margin-top:6px;color:var(--txt-3);position:relative}
 .kpi.a-blue{--accent:var(--blue)}.kpi.a-green{--accent:var(--green)}
 .kpi.a-amber{--accent:var(--amber)}.kpi.a-red{--accent:var(--red)}
+/* Kartu highlight (terang, tetap senada dengan aksen) — dipakai di Harga Jual Final */
+.kpi.kpi-hl{background:linear-gradient(160deg,#FF9BA3,#F0616D);border-color:#FFB3B9;box-shadow:0 6px 22px rgba(240,97,109,.35),inset 0 1px 0 rgba(255,255,255,.35)}
+.kpi.kpi-hl::after{background:linear-gradient(90deg,rgba(255,255,255,.85),transparent 70%)}
+.kpi.kpi-hl::before{background:radial-gradient(circle,#fff,transparent 70%);opacity:.18}
+.kpi.kpi-hl .kpi-lbl{color:rgba(40,10,14,.72)}
+.kpi.kpi-hl .kpi-val{color:#2A0B0F}
+.kpi.kpi-hl .kpi-sub{color:rgba(40,10,14,.7)}
+.kpi.kpi-hl:hover{border-color:#fff}
 
 /* ── Table panel ── */
 .panel{border:1px solid var(--line);border-radius:15px;overflow:hidden;background:var(--panel-grad);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);box-shadow:var(--shadow-md),inset 0 1px 0 rgba(255,255,255,.03)}
@@ -4777,22 +4785,27 @@ function renderHitungHarga(){
     c=runCalc(hargaFinal);
   } else {
     const targetMargin=(parseFloat(document.getElementById('hhTargetMargin').value)||0)/100;
-    let lo=hpp,hi=Math.max(hpp*30,1000000);
-    for(let i=0;i<60;i++){const mid=(lo+hi)/2;if(runCalc(mid).gm<targetMargin)lo=mid;else hi=mid;}
-    hargaFinal=hi; c=runCalc(hargaFinal);
-    hargaAwal=hargaFinal/returMult;
+    if(targetMargin<0||targetMargin>=1){resEl.innerHTML='<div class="empty">Target Margin harus antara 0% dan di bawah 100%.</div>';return;}
+    // Margin dasar: (Harga−HPP)÷Harga = target  →  Harga Awal = HPP ÷ (1 − target)
+    hargaAwal=Math.round(hpp/(1-targetMargin)*100)/100; // buang noise floating-point
+    hargaFinal=hargaAwal*returMult;
+    c=runCalc(hargaFinal);
     suggestedNote=`<div class="pg-info" style="margin-top:10px">
-      💡 Harga Jual Awal disaranin (sebelum retur): <b>${fmt(hargaAwal)}</b> (dibulatkan ke atas: <b>${fmt(Math.ceil(hargaAwal/100)*100)}</b>)<br>
-      💡 Harga Jual Final (setelah +${retur}% retur): <b>${fmt(hargaFinal)}</b>
+      💡 Harga Jual Awal disaranin (sebelum retur): <b>${fmtFull(hargaAwal)}</b> (dibulatkan ke atas: <b>${fmtFull(Math.ceil(hargaAwal/100-1e-9)*100)}</b>)<br>
+      <span style="color:var(--txt-3)">= HPP ${fmtFull(hpp)} ÷ (1 − ${(targetMargin*100).toLocaleString('id-ID')}%)</span><br>
+      💡 Harga Jual Final (setelah +${retur}% retur): <b>${fmtFull(hargaFinal)}</b> (dibulatkan ke atas: <b>${fmtFull(Math.ceil(hargaFinal/100-1e-9)*100)}</b>)
     </div>`;
+  }
+  if(c.net<0){
+    suggestedNote+=`<div class="pg-info" style="margin-top:10px;border-left-color:var(--red,#F0616D)">⚠️ Net Bersih minus: di harga ini, fee marketplace + OPEX + target profit + affiliate + ads melebihi margin. Naikin harga / turunin affiliate &amp; ads.</div>`;
   }
 
   resEl.innerHTML=`
     <div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">
-      <div class="kpi kpi-sm a-blue"><div class="kpi-lbl">GM % (Margin)</div><div class="kpi-val">${pct(hargaFinal>0?(hargaFinal-hpp)/hargaFinal:0)}</div><div class="kpi-sub">rumus dasar (Harga−HPP)÷Harga</div></div>
+      <div class="kpi kpi-sm a-blue"><div class="kpi-lbl">GM % (Margin)</div><div class="kpi-val">${pct(hargaAwal>0?(hargaAwal-hpp)/hargaAwal:0)}</div><div class="kpi-sub">rumus dasar (Harga Awal−HPP)÷Harga Awal · di Harga Final: ${pct(hargaFinal>0?(hargaFinal-hpp)/hargaFinal:0)}</div></div>
       <div class="kpi kpi-sm a-green"><div class="kpi-lbl">Net Bersih</div><div class="kpi-val">${pct(c.net)}</div><div class="kpi-sub">setelah target profit &amp; ads</div></div>
       <div class="kpi kpi-sm a-amber"><div class="kpi-lbl">Net Tanpa Iklan</div><div class="kpi-val">${pct(c.netNoAds)}</div><div class="kpi-sub">ads dianggap 0</div></div>
-      <div class="kpi kpi-sm a-red"><div class="kpi-lbl">Harga Jual Final</div><div class="kpi-val">${fmt(hargaFinal)}</div><div class="kpi-sub">Harga Jual × (1+${retur}% retur)</div></div>
+      <div class="kpi kpi-sm a-red kpi-hl"><div class="kpi-lbl">Harga Jual Final</div><div class="kpi-val">${fmtFull(hargaFinal)}</div><div class="kpi-sub">Harga Jual × (1+${retur}% retur)</div></div>
     </div>
     ${suggestedNote}
   `;
