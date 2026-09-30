@@ -666,6 +666,7 @@ tr.row-het-bad td{background:rgba(240,97,109,.05)}
             <div><label class="hh-lbl">Target Profit %</label><input class="inp editable" style="width:100%;text-align:left" id="hhTprofit" type="number" value="10" oninput="renderHitungHarga()"></div>
             <div><label class="hh-lbl">Affiliate %</label><input class="inp editable" style="width:100%;text-align:left" id="hhAfil" type="number" value="0" oninput="renderHitungHarga()"></div>
             <div><label class="hh-lbl">Ads %</label><input class="inp editable" style="width:100%;text-align:left" id="hhAds" type="number" value="0" oninput="renderHitungHarga()"></div>
+            <div><label class="hh-lbl">Retur % <span style="font-weight:400;text-transform:none;color:var(--txt-3)">(dari Harga Jual)</span></label><input class="inp editable" style="width:100%;text-align:left" id="hhRetur" type="number" value="0" oninput="renderHitungHarga()"></div>
           </div>
 
           <div id="hhResult" style="margin-top:22px"></div>
@@ -4760,30 +4761,38 @@ function renderHitungHarga(){
   const tprofit=parseFloat(document.getElementById('hhTprofit').value)||0;
   const afil=parseFloat(document.getElementById('hhAfil').value)||0;
   const ads=parseFloat(document.getElementById('hhAds').value)||0;
+  const retur=parseFloat(document.getElementById('hhRetur').value)||0;
+  const returMult=1+retur/100;
   const mode=(document.querySelector('input[name="hhMode"]:checked')||{}).value||'harga';
   const resEl=document.getElementById('hhResult');
   if(hpp<=0){resEl.innerHTML='<div class="empty">Isi HPP dulu.</div>';return;}
 
   const runCalc=harga=>calc({hpp,kat,berat,zone,minbeli:mb,harga,tprofit,afil,ads},plat);
 
-  let harga,c,suggestedNote='';
+  let hargaAwal,hargaFinal,c,suggestedNote='';
   if(mode==='harga'){
-    harga=parseFloat(document.getElementById('hhHarga').value)||0;
-    if(harga<=0){resEl.innerHTML='<div class="empty">Isi Harga Jual dulu.</div>';return;}
-    c=runCalc(harga);
+    hargaAwal=parseFloat(document.getElementById('hhHarga').value)||0;
+    if(hargaAwal<=0){resEl.innerHTML='<div class="empty">Isi Harga Jual dulu.</div>';return;}
+    hargaFinal=hargaAwal*returMult;
+    c=runCalc(hargaFinal);
   } else {
     const targetMargin=(parseFloat(document.getElementById('hhTargetMargin').value)||0)/100;
     let lo=hpp,hi=Math.max(hpp*30,1000000);
     for(let i=0;i<60;i++){const mid=(lo+hi)/2;if(runCalc(mid).gm<targetMargin)lo=mid;else hi=mid;}
-    harga=hi; c=runCalc(harga);
-    suggestedNote=`<div class="pg-info" style="margin-top:10px">💡 Harga Jual disaranin: <b>${fmt(harga)}</b> (dibulatkan ke atas: <b>${fmt(Math.ceil(harga/100)*100)}</b>)</div>`;
+    hargaFinal=hi; c=runCalc(hargaFinal);
+    hargaAwal=hargaFinal/returMult;
+    suggestedNote=`<div class="pg-info" style="margin-top:10px">
+      💡 Harga Jual Awal disaranin (sebelum retur): <b>${fmt(hargaAwal)}</b> (dibulatkan ke atas: <b>${fmt(Math.ceil(hargaAwal/100)*100)}</b>)<br>
+      💡 Harga Jual Final (setelah +${retur}% retur): <b>${fmt(hargaFinal)}</b>
+    </div>`;
   }
 
   resEl.innerHTML=`
-    <div class="kpi-row" style="grid-template-columns:repeat(3,1fr)">
-      <div class="kpi kpi-sm a-blue"><div class="kpi-lbl">GM % (Margin)</div><div class="kpi-val">${pct(harga>0?(harga-hpp)/harga:0)}</div><div class="kpi-sub">Harga Jual: ${fmt(harga)} · rumus dasar (Harga−HPP)÷Harga</div></div>
+    <div class="kpi-row" style="grid-template-columns:repeat(4,1fr)">
+      <div class="kpi kpi-sm a-blue"><div class="kpi-lbl">GM % (Margin)</div><div class="kpi-val">${pct(hargaFinal>0?(hargaFinal-hpp)/hargaFinal:0)}</div><div class="kpi-sub">rumus dasar (Harga−HPP)÷Harga</div></div>
       <div class="kpi kpi-sm a-green"><div class="kpi-lbl">Net Bersih</div><div class="kpi-val">${pct(c.net)}</div><div class="kpi-sub">setelah target profit &amp; ads</div></div>
       <div class="kpi kpi-sm a-amber"><div class="kpi-lbl">Net Tanpa Iklan</div><div class="kpi-val">${pct(c.netNoAds)}</div><div class="kpi-sub">ads dianggap 0</div></div>
+      <div class="kpi kpi-sm a-red"><div class="kpi-lbl">Harga Jual Final</div><div class="kpi-val">${fmt(hargaFinal)}</div><div class="kpi-sub">Harga Jual × (1+${retur}% retur)</div></div>
     </div>
     ${suggestedNote}
   `;
