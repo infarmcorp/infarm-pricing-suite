@@ -1443,17 +1443,15 @@ function calc(d, platKey){
   const opex=afterPPn*OPEX;                               // AF
   const gp=hargaKotor-opex-totalFeeMP-hppTotal;           // AG — dikonfirmasi cocok dengan Excel master (AK2 = AF2-AJ2-AE2-I2)
   const gm=hargaKotor>0?gp/hargaKotor:0;                  // AH (Gross profit %)
-  const tprofit=d.tprofit/100;                            // AI (target profit)
-  // AJ = % budget marketing dari omset bersih = AH - AI; di file: kalau negatif -> 0
-  const pctBudgetBersih=Math.max(gm-tprofit,0);           // AJ (clamp ke 0)
-  const budgetMktKotor=hargaKotor>0?(pctBudgetBersih*afterPPn)/hargaKotor:0; // AL
-  // AP = NETT kotor = AL - affiliate - ads
-  const nettKotor=budgetMktKotor-(d.afil/100)-(d.ads/100);// AP
-  // AR = Net bersih = (AB × AP) / AE ; di file tidak pernah negatif -> clamp ke 0
-  const net=afterPPn>0?(hargaKotor*nettKotor)/afterPPn:0; // AR (boleh minus jika afil+ads > budget)
-  // Net bersih tanpa iklan (ads dianggap 0)
-  const nettKotorNoAds=budgetMktKotor-(d.afil/100);
-  const netNoAds=afterPPn>0?(hargaKotor*nettKotorNoAds)/afterPPn:0;
+  const tprofit=(d.tprofit||0)/100;                       // AI (target profit)
+  // Net Bersih = GM − Target Profit − Affiliate − Ads  (semua % dari Harga Jual kotor)
+  // Sebelumnya: GM dikali omset setelah fee+PPN lalu dibagi lagi → fee & PPN terpotong dua kali
+  // (affiliate+ads seolah ×1,6). Diganti supaya sama dengan hitungan manual.
+  const afil=(d.afil||0)/100, adsPct=(d.ads||0)/100;
+  const budgetMktKotor=gm-tprofit;                        // sisa untuk marketing (boleh minus)
+  const nettKotor=budgetMktKotor-afil-adsPct;
+  const net=nettKotor;                                    // Net Bersih
+  const netNoAds=budgetMktKotor-afil;                     // Net Tanpa Iklan (ads dianggap 0)
   return {adminPct,feePct,logistik,totalFeeMP,masuk,afterPPn,opex,gp,gm,budgetMktKotor,nettKotor,net,netNoAds,hargaKotor,tier:beratToTier(d.berat)};
 }
 
