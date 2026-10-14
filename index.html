@@ -534,7 +534,7 @@ tr.row-het-bad td{background:rgba(240,97,109,.05)}
 #msTable tr.ms-total td,#msShopTable tr.ms-total td{font-weight:700;background:var(--bg-3);position:sticky;bottom:0;border-top:1px solid var(--line)}
 #msTable td.num,#msTable th.num,#msShopTable td.num{text-align:right}
 @media (max-width:1100px){.ms-kpi{grid-template-columns:repeat(3,1fr)}}
-.ms-kpi{grid-template-columns:repeat(6,1fr)}
+.ms-kpi{grid-template-columns:repeat(5,1fr)}
 .ms-dual{display:flex;flex-direction:column;gap:5px;position:relative}
 .ms-dual>div{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
 .ms-dl{font-size:9.5px;color:var(--txt-3);white-space:nowrap}
@@ -1066,7 +1066,6 @@ tr.row-het-bad td{background:rgba(240,97,109,.05)}
           <div class="ms-dual"><div><span class="ms-dl">Sebelum PPN</span><span class="ms-dv" id="ms-spend">–</span></div><div><span class="ms-dl">+PPN 11%</span><span class="ms-dv ms-main" id="ms-spend-ppn">–</span></div></div></div>
         <div class="kpi a-blue"><div class="kpi-lbl">Omset Iklan (kotor)</div><div class="kpi-val" id="ms-rev">–</div><div class="kpi-sub">revenue dari iklan</div></div>
         <div class="kpi a-blue"><div class="kpi-lbl">ROAS</div><div class="kpi-val" id="ms-roas">–</div><div class="kpi-sub">omset iklan ÷ spend</div></div>
-        <div class="kpi a-red"><div class="kpi-lbl">ACOS</div><div class="kpi-val" id="ms-acos">–</div><div class="kpi-sub">spend+PPN ÷ omset bersih total</div></div>
         <div class="kpi a-green"><div class="kpi-lbl">Omset Bersih Total</div><div class="kpi-val" id="ms-omset">–</div><div class="kpi-sub">semua toko + non-marketplace</div></div>
         <div class="kpi ms-pct-card" id="ms-pct-card"><div class="kpi-lbl">% Spend</div>
           <div class="ms-dual"><div><span class="ms-dl">Sebelum PPN</span><span class="ms-dv" id="ms-pct">–</span></div><div><span class="ms-dl">+PPN 11%</span><span class="ms-dv ms-main ms-pct-main" id="ms-pct-ppn">–</span></div></div>
@@ -4936,7 +4935,6 @@ function renderSpending(){
   const p=om>0?sp/om:NaN, pP=om>0?spP/om:NaN;
   setKPI('ms-spend',fmt(sp)); setKPI('ms-spend-ppn',fmt(spP)); setKPI('ms-rev',fmt(rv));
   setKPI('ms-roas',sp>0?(rv/sp).toFixed(2).replace('.',',')+'×':'–');
-  document.getElementById('ms-acos').textContent=om>0?msPct(spP/om):'–';
   setKPI('ms-omset',fmt(om));
   const card=document.getElementById('ms-pct-card'); const st=msStatus(pP,tg?tg.pct:null);
   card.className='kpi ms-pct-card'+(st.cls?' st-'+st.cls:'');
@@ -4985,13 +4983,12 @@ function msPctCell(sp,om,t){
   return msPill(sp*(1+MS_PPN)/om,t)+`<span class="ms-small">sblm PPN ${msPct(sp/om)}</span>`;
 }
 const msRoas=(rv,sp)=>sp>0?(rv/sp).toFixed(2).replace('.',','):'–';
-const msAcos=(sp,om)=>om>0?msPct(sp*(1+MS_PPN)/om):'–'; // ACOS = spend+PPN ÷ omset bersih
 
 function renderSpendDaily(daysIn){
   const days=daysIn||msDaily();
   const from=document.getElementById('msFrom').value, to=document.getElementById('msTo').value;
   const list=Object.values(days).filter(d=>(!from||d.tanggal>=from)&&(!to||d.tanggal<=to)&&(d.adsFilled||d.omsetFilled)).sort((a,b)=>a.tanggal<b.tanggal?-1:1);
-  let h=`<thead><tr><th>Tanggal</th><th class="num">Spend</th><th class="num">Spend +PPN</th><th class="num">Omset Iklan</th><th class="num">ROAS</th><th class="num">ACOS</th><th class="num">Omset Bersih</th><th class="num">% Harian<br><span style="font-weight:400">+PPN</span></th><th class="num">% Kumulatif<br><span style="font-weight:400">+PPN</span></th></tr></thead><tbody>`;
+  let h=`<thead><tr><th>Tanggal</th><th class="num">Spend</th><th class="num">Spend +PPN</th><th class="num">Omset Iklan</th><th class="num">ROAS</th><th class="num">Omset Bersih</th><th class="num">% Harian<br><span style="font-weight:400">+PPN</span></th><th class="num">% Kumulatif<br><span style="font-weight:400">+PPN</span></th></tr></thead><tbody>`;
   let cs=0,co=0,ts=0,tr=0,to2=0,lastT=null;
   list.forEach(d=>{
     const tg=msTargetFor(d.tanggal.slice(0,7)); const t=tg?tg.pct:null; lastT=t;
@@ -5003,7 +5000,7 @@ function renderSpendDaily(daysIn){
       <td>${open?'▾':'▸'} ${msDate(d.tanggal)}${!complete?' <span class="qbadge q-warn">'+(d.adsFilled?'omset belum masuk':'spend belum diisi')+'</span>':''}</td>
       <td class="num">${d.adsFilled?fmt(d.spend):'–'}</td><td class="num">${d.adsFilled?fmt(d.spend*(1+MS_PPN)):'–'}</td>
       <td class="num">${d.adsFilled?fmt(d.revenue):'–'}</td>
-      <td class="num">${msRoas(d.revenue,d.spend)}</td><td class="num">${d.adsFilled&&d.omsetFilled?msAcos(d.spend,d.omset):'–'}</td>
+      <td class="num">${msRoas(d.revenue,d.spend)}</td>
       <td class="num">${d.omsetFilled?fmt(d.omset):'–'}</td>
       <td class="num">${complete?msPctCell(d.spend,d.omset,t):'–'}</td>
       <td class="num">${complete?msPctCell(cs,co,t):'–'}</td></tr>`;
@@ -5012,16 +5009,16 @@ function renderSpendDaily(daysIn){
         h+=`<tr class="ms-sub"><td style="padding-left:28px">${s.code}</td>
           <td class="num">${s.spend?fmt(s.spend):'–'}</td><td class="num">${s.spend?fmt(s.spend*(1+MS_PPN)):'–'}</td>
           <td class="num">${s.revenue?fmt(s.revenue):'–'}</td>
-          <td class="num">${msRoas(s.revenue,s.spend)}</td><td class="num">${s.spend?msAcos(s.spend,s.omset):'–'}</td>
+          <td class="num">${msRoas(s.revenue,s.spend)}</td>
           <td class="num">${s.omset?fmt(s.omset):'–'}</td>
           <td class="num">${s.spend&&s.omset>0?msPct(s.spend*(1+MS_PPN)/s.omset):'–'}</td><td></td></tr>`;
       });
     }
   });
-  if(!list.length)h+=`<tr><td colspan="9"><div class="empty">${msLoaded?'Tidak ada data di rentang tanggal ini.':'Memuat…'}</div></td></tr>`;
+  if(!list.length)h+=`<tr><td colspan="8"><div class="empty">${msLoaded?'Tidak ada data di rentang tanggal ini.':'Memuat…'}</div></td></tr>`;
   else{
     h+=`<tr class="ms-total"><td>Total rentang</td><td class="num">${fmt(ts)}</td><td class="num">${fmt(ts*(1+MS_PPN))}</td><td class="num">${fmt(tr)}</td>
-      <td class="num">${msRoas(tr,ts)}</td><td class="num">${msAcos(cs,co)}</td><td class="num">${fmt(to2)}</td>
+      <td class="num">${msRoas(tr,ts)}</td><td class="num">${fmt(to2)}</td>
       <td class="num" colspan="2">${msPctCell(cs,co,lastT)}${ts!==cs?'<span class="ms-small">(% dari hari lengkap saja)</span>':''}</td></tr>`;
   }
   document.getElementById('msTable').innerHTML=h+'</tbody>';
@@ -5052,7 +5049,7 @@ function renderSpendShops(daysIn){
     if(adsF==='noads'&&x.spend>0)return false;
     return true;
   });
-  rows.forEach(x=>{x.spendP=x.spend*(1+MS_PPN);x.roas=x.spend>0?x.revenue/x.spend:0;x.acos=x.omset>0&&x.spend>0?x.spendP/x.omset:0;
+  rows.forEach(x=>{x.spendP=x.spend*(1+MS_PPN);x.roas=x.spend>0?x.revenue/x.spend:0;
     x.pct=x.omset>0&&x.spend>0?x.spendP/x.omset:0;x.shareSp=totSp>0?x.spend/totSp:0;x.shareOm=totOm>0?x.omset/totOm:0;});
   tfRegister('msshop',[
     {key:'code',label:'Toko',type:'text',get:r=>r.code},
@@ -5060,7 +5057,6 @@ function renderSpendShops(daysIn){
     {key:'spendP',label:'Spend +PPN',type:'num',get:r=>r.spendP},
     {key:'revenue',label:'Omset Iklan',type:'num',get:r=>r.revenue},
     {key:'roas',label:'ROAS',type:'num',get:r=>r.roas},
-    {key:'acos',label:'ACOS',type:'num',get:r=>r.acos},
     {key:'omset',label:'Omset Bersih',type:'num',get:r=>r.omset},
     {key:'pct',label:'% Spend +PPN',type:'num',get:r=>r.pct},
     {key:'shareSp',label:'Porsi Spend',type:'num',get:r=>r.shareSp},
@@ -5074,12 +5070,12 @@ function renderSpendShops(daysIn){
     h+=`<tr><td class="td-sku">${x.code}</td>
       <td class="num">${x.spend?fmt(x.spend):'–'}</td><td class="num">${x.spend?fmt(x.spendP):'–'}</td>
       <td class="num">${x.revenue?fmt(x.revenue):'–'}</td><td class="num">${x.spend?msRoas(x.revenue,x.spend):'–'}</td>
-      <td class="num">${x.acos?msPct(x.acos):'–'}</td><td class="num">${x.omset?fmt(x.omset):'–'}</td>
+      <td class="num">${x.omset?fmt(x.omset):'–'}</td>
       <td class="num">${x.pct?msPct(x.pct):'–'}</td>
       <td class="num">${x.spend?msPct(x.shareSp):'–'}</td><td class="num">${x.omset?msPct(x.shareOm):'–'}</td></tr>`;});
-  if(!sorted.length)h+=`<tr><td colspan="10"><div class="empty">${msLoaded?'Tidak ada toko yang cocok dengan filter.':'Memuat…'}</div></td></tr>`;
+  if(!sorted.length)h+=`<tr><td colspan="9"><div class="empty">${msLoaded?'Tidak ada toko yang cocok dengan filter.':'Memuat…'}</div></td></tr>`;
   else h+=`<tr class="ms-total"><td>Total (${sorted.length} toko)</td><td class="num">${fmt(S)}</td><td class="num">${fmt(S*(1+MS_PPN))}</td><td class="num">${fmt(R)}</td>
-    <td class="num">${msRoas(R,S)}</td><td class="num">${msAcos(S,O)}</td><td class="num">${fmt(O)}</td>
+    <td class="num">${msRoas(R,S)}</td><td class="num">${fmt(O)}</td>
     <td class="num">${O>0&&S>0?msPct(S*(1+MS_PPN)/O):'–'}</td><td class="num">${totSp?msPct(S/totSp):'–'}</td><td class="num">${totOm?msPct(O/totOm):'–'}</td></tr>`;
   document.getElementById('msShopTable').innerHTML=h+'</tbody>';
 }
