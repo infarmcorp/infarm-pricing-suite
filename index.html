@@ -514,6 +514,26 @@ tr.row-het-bad td{background:rgba(240,97,109,.05)}
 .kat-bg{flex:1;height:7px;background:var(--bg);border-radius:4px;overflow:hidden}
 .kat-bar{height:100%;border-radius:4px;background:var(--blue)}
 .kat-p{font-size:10.5px;font-weight:600;color:var(--txt-2);width:42px;text-align:right;flex-shrink:0;font-family:'JetBrains Mono',monospace}
+/* ── Monitoring Spending ── */
+.ms-sync{font-size:10.5px;color:var(--txt-3)}
+.ms-target{display:inline-flex;align-items:center;gap:16px;padding:10px 14px;margin-bottom:14px;border:1px solid var(--line);border-radius:12px;background:var(--bg-2)}
+.ms-target-r{display:flex;align-items:center;gap:6px}
+.ms-target-sub{font-size:10px;color:var(--txt-3);margin-top:3px}
+.ms-kpi{grid-template-columns:repeat(5,1fr)}
+.ms-pct-card.st-ok{--accent:var(--green)}
+.ms-pct-card.st-over{--accent:var(--red)}
+.ms-pct-card.st-under{--accent:var(--amber)}
+.ms-pct-card.st-ok .kpi-val{color:#5FD3A0}
+.ms-pct-card.st-over .kpi-val{color:#F58892}
+.ms-pct-card.st-under .kpi-val{color:#E8BC63}
+.ms-range{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.ms-range .pc-month{padding:5px 8px;font-size:11px}
+#msTable tr.ms-day{cursor:pointer}
+#msTable tr.ms-day:hover td{background:var(--bg-hover)}
+#msTable tr.ms-sub td{background:rgba(255,255,255,.02);font-size:10.5px;color:var(--txt-2)}
+#msTable tr.ms-total td{font-weight:700;background:var(--bg-3);position:sticky;bottom:0;border-top:1px solid var(--line)}
+#msTable td.num,#msTable th.num{text-align:right}
+@media (max-width:1100px){.ms-kpi{grid-template-columns:repeat(3,1fr)}}
 </style>
 </head>
 <body>
@@ -573,6 +593,10 @@ tr.row-het-bad td{background:rgba(240,97,109,.05)}
       <div class="nav-item" data-page="adsaudit" onclick="nav('adsaudit')">
         <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6"/><rect x="12" y="8" width="3" height="10"/><rect x="17" y="5" width="3" height="13"/></svg>
         Audit Iklan
+      </div>
+      <div class="nav-item" data-page="spending" onclick="nav('spending')">
+        <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="9"/><path d="M12 7v10M15 9.5c0-1.4-1.3-2.2-3-2.2s-3 .8-3 2.2 1.3 2 3 2.3 3 .9 3 2.3-1.3 2.2-3 2.2-3-.8-3-2.2"/></svg>
+        Monitoring Spending
       </div>
       <div class="nav-item" data-page="hetaudit" onclick="nav('hetaudit')">
         <svg class="nav-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 2l3 6 6 .5-4.5 4 1.5 6-6-3.5-6 3.5 1.5-6L3 8.5 9 8z"/><path d="M9 12l2 2 4-4" stroke-width="1.5"/></svg>
@@ -1000,6 +1024,61 @@ tr.row-het-bad td{background:rgba(240,97,109,.05)}
     <!-- (halaman Audit lama dihapus, digabung ke Proyeksi) -->
 
     <!-- AUDIT IKLAN -->
+    <div class="content page" id="page-spending">
+      <div class="proy-controls">
+        <div class="pc-left">
+          <label class="pc-lbl">Bulan</label>
+          <input type="month" class="pc-month" id="msMonth" onchange="msMonthChanged()">
+        </div>
+        <div class="pc-right" style="display:flex;align-items:center;gap:10px">
+          <span class="ms-sync" id="msSync">–</span>
+          <button class="tbtn" onclick="loadSpending(true)">↻ Muat ulang</button>
+        </div>
+      </div>
+
+      <!-- target % (kotak kecil, hanya admin yang bisa ubah) -->
+      <div class="ms-target" id="msTargetBox">
+        <div class="ms-target-l">
+          <div class="kpi-lbl" style="margin:0">Target % Spend</div>
+          <div class="ms-target-sub" id="msTargetSub">–</div>
+        </div>
+        <div class="ms-target-r">
+          <input class="inp" id="msTargetInp" type="number" step="0.01" min="0" max="100" style="width:76px">
+          <span style="color:var(--txt-3);font-size:12px">%</span>
+          <button class="tbtn" id="msTargetBtn" onclick="saveSpendTarget()">Simpan</button>
+        </div>
+      </div>
+
+      <!-- KPI bulanan -->
+      <div class="kpi-row ms-kpi">
+        <div class="kpi a-amber"><div class="kpi-lbl">Spend Ads</div><div class="kpi-val" id="ms-spend">–</div><div class="kpi-sub">total semua toko</div></div>
+        <div class="kpi a-blue"><div class="kpi-lbl">Omset Iklan (kotor)</div><div class="kpi-val" id="ms-rev">–</div><div class="kpi-sub">revenue dari iklan</div></div>
+        <div class="kpi a-blue"><div class="kpi-lbl">ROAS</div><div class="kpi-val" id="ms-roas">–</div><div class="kpi-sub">omset iklan ÷ spend</div></div>
+        <div class="kpi a-green"><div class="kpi-lbl">Omset Bersih Total</div><div class="kpi-val" id="ms-omset">–</div><div class="kpi-sub">semua toko + non-marketplace</div></div>
+        <div class="kpi ms-pct-card" id="ms-pct-card"><div class="kpi-lbl">% Spend</div><div class="kpi-val" id="ms-pct">–</div><div class="kpi-sub" id="ms-pct-sub">–</div></div>
+      </div>
+      <div class="pg-info" id="msNote" style="margin:-6px 0 16px 2px"></div>
+
+      <!-- tracker harian -->
+      <div class="panel">
+        <div class="panel-head">
+          <span class="panel-title">📅 Tracker Harian</span>
+          <div class="ms-range">
+            <input type="date" class="pc-month" id="msFrom" onchange="renderSpendDaily()">
+            <span style="color:var(--txt-3)">s/d</span>
+            <input type="date" class="pc-month" id="msTo" onchange="renderSpendDaily()">
+            <button class="tbtn" onclick="msQuickRange('month')">Bulan ini</button>
+            <button class="tbtn" onclick="msQuickRange(7)">7 hari</button>
+            <button class="tbtn" onclick="msQuickRange(30)">30 hari</button>
+          </div>
+        </div>
+        <div class="tbl-scroll" style="max-height:560px"><table id="msTable"></table></div>
+        <div class="legend" style="padding:10px 16px;font-size:10.5px;color:var(--txt-3)">
+          🟢 sesuai target (±0,25 poin) · 🔴 over · 🟡 under · klik baris untuk lihat per toko · % per toko hanya informasi, target berlaku untuk total
+        </div>
+      </div>
+    </div>
+
     <div class="content page" id="page-adsaudit">
       <div class="proy-controls">
         <div class="pc-left">
@@ -4715,11 +4794,213 @@ function applyAdsUpload(wb,plat){
 }
 
 // ═══════════════════════ NAV ═══════════════════════
+// ═══════════════════════ MONITORING SPENDING (% spend ads vs omset bersih total) ═══════════════════════
+// Sumber: spreadsheet (RAW Ads & RAW Omset bersih) → Apps Script → Supabase (ads_daily, omset_daily).
+// Target % per bulan di spend_targets (hanya admin yang bisa ubah).
+let MS_ADS=[], MS_OM=[], MS_TARGETS={}, MS_SYNC=null, msLoaded=false, msLoading=false, msOpenDays=new Set();
+const MS_TOL=0.0025; // ±0,25 poin = "sesuai target"
+
+async function msFetchAll(table, cols){
+  const out=[]; const size=1000;
+  for(let from=0;;from+=size){
+    const {data,error}=await supa.from(table).select(cols).order('tanggal',{ascending:true}).range(from,from+size-1);
+    if(error)throw error;
+    out.push(...(data||[]));
+    if(!data||data.length<size)break;
+  }
+  return out;
+}
+async function loadSpending(force){
+  if(msLoading)return;
+  if(msLoaded&&!force){renderSpending();return;}
+  if(!supa){renderSpending();return;}
+  msLoading=true;
+  document.getElementById('msSync').textContent='Memuat data…';
+  try{
+    const [ads,om,tg,lg]=await Promise.all([
+      msFetchAll('ads_daily','tanggal,shop_code,store_name,spend,revenue'),
+      msFetchAll('omset_daily','tanggal,shop_code,omset'),
+      supa.from('spend_targets').select('*'),
+      supa.from('sync_log').select('*').order('waktu',{ascending:false}).limit(1)
+    ]);
+    if(tg.error)throw tg.error;
+    MS_ADS=ads.map(r=>({...r,spend:+r.spend||0,revenue:+r.revenue||0}));
+    MS_OM=om.map(r=>({...r,omset:+r.omset||0}));
+    MS_TARGETS={}; (tg.data||[]).forEach(t=>MS_TARGETS[t.bulan]=t);
+    MS_SYNC=(lg.data&&lg.data[0])||null;
+    msLoaded=true;
+  }catch(e){console.warn(e);dbStatus('⚠️ Gagal memuat data spending','err');}
+  msLoading=false;
+  renderSpending();
+}
+function initSpending(){
+  const m=document.getElementById('msMonth');
+  if(!m.value){const d=new Date();m.value=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');}
+  loadSpending(false);
+}
+
+// ringkasan per tanggal
+function msDaily(){
+  const days={};
+  const g=t=>days[t]||(days[t]={tanggal:t,spend:0,revenue:0,omset:0,omsetFilled:false,shops:{}});
+  const sh=(d,code,name)=>d.shops[code]||(d.shops[code]={code,name:name||code,spend:0,revenue:0,omset:0});
+  MS_ADS.forEach(r=>{const d=g(r.tanggal);d.spend+=r.spend;d.revenue+=r.revenue;const s=sh(d,r.shop_code,r.store_name);s.spend+=r.spend;s.revenue+=r.revenue;if(r.store_name)s.name=r.store_name;});
+  MS_OM.forEach(r=>{const d=g(r.tanggal);d.omset+=r.omset;if(r.omset!==0)d.omsetFilled=true;sh(d,r.shop_code).omset+=r.omset;});
+  Object.values(days).forEach(d=>d.adsFilled=d.spend>0||d.revenue>0);
+  return days;
+}
+// tanggal terakhir yang spend & omset-nya sama-sama sudah terisi
+function msCutoff(days){
+  let la='',lo='';
+  Object.values(days).forEach(d=>{if(d.adsFilled&&d.tanggal>la)la=d.tanggal;if(d.omsetFilled&&d.tanggal>lo)lo=d.tanggal;});
+  return {lastAds:la,lastOm:lo,cutoff:(la&&lo)?(la<lo?la:lo):''};
+}
+// target berlaku: bulan itu, kalau kosong ikut bulan terakhir sebelumnya
+function msTargetFor(bulan){
+  if(MS_TARGETS[bulan])return {pct:+MS_TARGETS[bulan].target_pct/100,row:MS_TARGETS[bulan],from:bulan};
+  const prev=Object.keys(MS_TARGETS).filter(b=>b<bulan).sort().pop();
+  if(prev)return {pct:+MS_TARGETS[prev].target_pct/100,row:MS_TARGETS[prev],from:prev,inherited:true};
+  return null;
+}
+function msStatus(p,t){
+  if(t==null||!isFinite(p))return {cls:'',ico:'⚪',lbl:'tanpa target'};
+  if(p>t+MS_TOL)return {cls:'over',ico:'🔴',lbl:'over'};
+  if(p<t-MS_TOL)return {cls:'under',ico:'🟡',lbl:'under'};
+  return {cls:'ok',ico:'🟢',lbl:'sesuai target'};
+}
+const msDate=s=>{if(!s)return '–';const [y,m,d]=s.split('-');return +d+' '+['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'][+m-1]+(y!==String(new Date().getFullYear())?' '+y:'');};
+const msPct=n=>isFinite(n)?(Math.round(n*10000)/100).toFixed(2).replace('.',',')+'%':'–';
+function msPill(p,t){const s=msStatus(p,t);if(!isFinite(p))return '<span style="color:var(--txt-3)">–</span>';return `<span class="pill ${s.cls==='ok'?'p-pos':s.cls==='over'?'p-neg':s.cls==='under'?'p-warn':''}">${s.ico} ${msPct(p)}</span>`;}
+
+function renderSpending(){
+  const month=document.getElementById('msMonth').value;
+  const days=msDaily(); const {lastAds,lastOm,cutoff}=msCutoff(days);
+  // info sync
+  const sEl=document.getElementById('msSync');
+  if(MS_SYNC){const w=new Date(MS_SYNC.waktu);sEl.textContent=`Sync terakhir: ${w.toLocaleString('id-ID',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})} · Ads s/d ${msDate(lastAds)} · Omset s/d ${msDate(lastOm)}`;}
+  else sEl.textContent=msLoaded?'Belum ada data dari spreadsheet (sync belum jalan)':'–';
+
+  // target box
+  const tg=msTargetFor(month); const isAdmin=currentRole==='admin';
+  const inp=document.getElementById('msTargetInp'), btn=document.getElementById('msTargetBtn');
+  if(document.activeElement!==inp)inp.value=tg?+(tg.pct*100).toFixed(2):'';
+  inp.disabled=!isAdmin; inp.style.opacity=isAdmin?'':'0.6'; btn.style.display=isAdmin?'':'none';
+  document.getElementById('msTargetSub').textContent=!tg?(isAdmin?'belum diatur — isi lalu Simpan':'belum diatur admin')
+    :tg.inherited?`${monthLabel(month)} · ikut target ${monthLabel(tg.from)}`
+    :`${monthLabel(month)} · diatur ${tg.row.updated_by||'admin'}${isAdmin?'':' (hanya admin yang bisa ubah)'}`;
+
+  // KPI bulan (hanya tanggal ≤ cutoff)
+  let sp=0,rv=0,om=0,pend=0,pendFrom='',pendTo='',nDays=0;
+  Object.values(days).forEach(d=>{
+    if(d.tanggal.slice(0,7)!==month)return;
+    if(cutoff&&d.tanggal<=cutoff){sp+=d.spend;rv+=d.revenue;om+=d.omset;if(d.adsFilled||d.omsetFilled)nDays++;}
+    else if(d.adsFilled){pend+=d.spend;if(!pendFrom||d.tanggal<pendFrom)pendFrom=d.tanggal;if(d.tanggal>pendTo)pendTo=d.tanggal;}
+  });
+  const p=om>0?sp/om:NaN;
+  setKPI('ms-spend',fmt(sp)); setKPI('ms-rev',fmt(rv));
+  setKPI('ms-roas',sp>0?(rv/sp).toFixed(2).replace('.',',')+'×':'–'); setKPI('ms-omset',fmt(om));
+  const card=document.getElementById('ms-pct-card'); const st=msStatus(p,tg?tg.pct:null);
+  card.className='kpi ms-pct-card'+(st.cls?' st-'+st.cls:'');
+  document.getElementById('ms-pct').textContent=isFinite(p)?msPct(p):'–';
+  let sub='–';
+  if(isFinite(p)&&tg){
+    const jatah=tg.pct*om, sel=sp-jatah;
+    sub=st.cls==='ok'?`${st.ico} sesuai target ${msPct(tg.pct)} (jatah ${fmt(jatah)})`
+      :`${st.ico} ${st.lbl} ${fmt(Math.abs(sel))} dari jatah ${msPct(tg.pct)}`;
+  } else if(isFinite(p)) sub='target belum diatur';
+  document.getElementById('ms-pct-sub').textContent=sub;
+
+  // catatan kelengkapan data
+  const monthEnd=month+'-31';
+  let note='';
+  if(!msLoaded) note='';
+  else if(!nDays&&!pend) note='Belum ada data untuk bulan ini.';
+  else{
+    note=cutoff&&cutoff<monthEnd&&cutoff.slice(0,7)===month?`📌 Angka dihitung dari data lengkap s/d <b>${msDate(cutoff)}</b>.`:(cutoff>=monthEnd||(cutoff&&cutoff.slice(0,7)>month)?'📌 Data bulan ini lengkap.':'');
+    if(pend>0)note+=` Spend <b>${fmt(pend)}</b> (${msDate(pendFrom)}${pendTo!==pendFrom?'–'+msDate(pendTo):''}) belum dihitung karena omset bersihnya belum masuk.`;
+  }
+  document.getElementById('msNote').innerHTML=note;
+
+  // default rentang tracker = bulan terpilih
+  const f=document.getElementById('msFrom'), t=document.getElementById('msTo');
+  if(!f.value||!t.value||f.dataset.month!==month){msSetRange(month+'-01',msMonthLast(month));f.dataset.month=month;}
+  renderSpendDaily(days);
+  if(typeof applyPerms==='function'&&currentUser)applyPerms();
+}
+function msMonthLast(month){const [y,m]=month.split('-').map(Number);return month+'-'+String(new Date(y,m,0).getDate()).padStart(2,'0');}
+function msSetRange(a,b){document.getElementById('msFrom').value=a;document.getElementById('msTo').value=b;}
+function msMonthChanged(){msOpenDays.clear();renderSpending();}
+function msQuickRange(k){
+  const days=msDaily(); const {cutoff,lastAds}=msCutoff(days);
+  const end=lastAds||cutoff||new Date().toISOString().slice(0,10);
+  if(k==='month'){const m=document.getElementById('msMonth').value;msSetRange(m+'-01',msMonthLast(m));}
+  else{const d=new Date(end+'T00:00:00');d.setDate(d.getDate()-(k-1));const s=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');msSetRange(s,end);}
+  renderSpendDaily(days);
+}
+function msToggleDay(t){if(msOpenDays.has(t))msOpenDays.delete(t);else msOpenDays.add(t);renderSpendDaily();}
+
+function renderSpendDaily(daysIn){
+  const days=daysIn||msDaily(); const {cutoff}=msCutoff(days);
+  const from=document.getElementById('msFrom').value, to=document.getElementById('msTo').value;
+  const list=Object.values(days).filter(d=>(!from||d.tanggal>=from)&&(!to||d.tanggal<=to)&&(d.adsFilled||d.omsetFilled)).sort((a,b)=>a.tanggal<b.tanggal?-1:1);
+  let h=`<thead><tr><th>Tanggal</th><th class="num">Spend</th><th class="num">Omset Iklan</th><th class="num">ROAS</th><th class="num">Omset Bersih</th><th class="num">% Harian</th><th class="num">% Kumulatif</th></tr></thead><tbody>`;
+  let cs=0,co=0,cr=0,ts=0,tr=0,to2=0,lastT=null;
+  list.forEach(d=>{
+    const tg=msTargetFor(d.tanggal.slice(0,7)); const t=tg?tg.pct:null; lastT=t;
+    const complete=d.adsFilled&&d.omsetFilled;
+    ts+=d.spend;tr+=d.revenue;
+    if(complete){cs+=d.spend;co+=d.omset;to2+=d.omset;}
+    const pd=complete&&d.omset>0?d.spend/d.omset:NaN, pc=co>0&&complete?cs/co:NaN;
+    const open=msOpenDays.has(d.tanggal);
+    h+=`<tr class="ms-day" onclick="msToggleDay('${d.tanggal}')">
+      <td>${open?'▾':'▸'} ${msDate(d.tanggal)}${!complete?' <span class="qbadge q-warn">'+(d.adsFilled?'omset belum masuk':'spend belum diisi')+'</span>':''}</td>
+      <td class="num">${d.adsFilled?fmt(d.spend):'–'}</td><td class="num">${d.adsFilled?fmt(d.revenue):'–'}</td>
+      <td class="num">${d.spend>0?(d.revenue/d.spend).toFixed(2).replace('.',','):'–'}</td>
+      <td class="num">${d.omsetFilled?fmt(d.omset):'–'}</td>
+      <td class="num">${msPill(pd,t)}</td><td class="num">${msPill(pc,t)}</td></tr>`;
+    if(open){
+      Object.values(d.shops).filter(s=>s.spend||s.revenue||s.omset).sort((a,b)=>b.spend-a.spend||b.omset-a.omset).forEach(s=>{
+        h+=`<tr class="ms-sub"><td style="padding-left:28px">${s.name} <span style="color:var(--txt-3)">${s.code}</span></td>
+          <td class="num">${s.spend?fmt(s.spend):'–'}</td><td class="num">${s.revenue?fmt(s.revenue):'–'}</td>
+          <td class="num">${s.spend>0?(s.revenue/s.spend).toFixed(2).replace('.',','):'–'}</td>
+          <td class="num">${s.omset?fmt(s.omset):'–'}</td>
+          <td class="num">${s.spend&&s.omset>0?msPct(s.spend/s.omset):'–'}</td><td></td></tr>`;
+      });
+    }
+  });
+  if(!list.length)h+=`<tr><td colspan="7"><div class="empty">${msLoaded?'Tidak ada data di rentang tanggal ini.':'Memuat…'}</div></td></tr>`;
+  else{
+    const pt=co>0?cs/co:NaN;
+    h+=`<tr class="ms-total"><td>Total rentang</td><td class="num">${fmt(ts)}</td><td class="num">${fmt(tr)}</td>
+      <td class="num">${ts>0?(tr/ts).toFixed(2).replace('.',','):'–'}</td><td class="num">${fmt(to2)}</td>
+      <td class="num" colspan="2">${msPill(pt,lastT)}${ts!==cs?' <span style="font-weight:400;color:var(--txt-3)">(hari lengkap saja)</span>':''}</td></tr>`;
+  }
+  document.getElementById('msTable').innerHTML=h+'</tbody>';
+}
+
+async function saveSpendTarget(){
+  if(currentRole!=='admin'){alert('Hanya admin yang bisa mengubah target.');return;}
+  const month=document.getElementById('msMonth').value;
+  const v=parseFloat(String(document.getElementById('msTargetInp').value).replace(',','.'));
+  if(!isFinite(v)||v<0||v>100){alert('Isi target % antara 0 dan 100.');return;}
+  const old=msTargetFor(month);
+  const row={bulan:month,target_pct:v,updated_by:(currentUser&&currentUser.email)||'',updated_at:new Date().toISOString()};
+  try{
+    const {error}=await supa.from('spend_targets').upsert(row,{onConflict:'bulan'});
+    if(error)throw error;
+    MS_TARGETS[month]=row;
+    logChange('Ubah target % spend ads',monthLabel(month),old?(old.pct*100).toFixed(2)+'%':'',v+'%');
+    dbStatus('✓ Target % spend tersimpan','ok');
+  }catch(e){console.warn(e);alert('Gagal menyimpan target: '+(e.message||e));}
+  renderSpending();
+}
+
 const TITLES={
   dashboard:['Dashboard','Ringkasan kinerja bulan ini'],
   proyeksi:['Proyeksi','Target per SKU'],
   audit:['Audit','Omset real vs proyeksi'],
   adsaudit:['Audit Iklan','Cut vs Scale per listing'],
+  spending:['Monitoring Spending','% spend ads vs omset bersih total'],
   hetaudit:['Audit HET','Harga jual vs HET per platform'],
   tugas:['Tugas','Monitoring deadline & PIC'],
   kalkulator:['Kalkulator Harga','Multi-platform per SKU'],
@@ -5051,6 +5332,7 @@ function nav(p){
   closeSidebar();
   if(p==='proyeksi'&&typeof setProyMode==='function')setProyMode(proyMode||'unit');
   if(p==='adsaudit')renderAdsAudit();
+  if(p==='spending')initSpending();
   if(p==='hetaudit')renderHetAudit();
   if(p==='tugas')loadTasks();
   if(p==='hitung'&&typeof initHitungHarga==='function')initHitungHarga();
