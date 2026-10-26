@@ -696,7 +696,7 @@ tr.row-het-bad td{background:rgba(240,97,109,.05)}
 
           <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
             <div><label class="hh-lbl">HPP</label><input class="inp editable" style="width:100%;text-align:left" id="hhHpp" type="number" value="10000" oninput="renderHitungHarga()"></div>
-            <div><label class="hh-lbl">Kategori <span style="font-weight:400;text-transform:none;color:var(--txt-3)">(opsional, buat fee TikTok kategori GARDEN TOOLS)</span></label><input class="inp editable" style="width:100%;text-align:left" id="hhKat" type="text" placeholder="mis. GARDEN TOOLS" oninput="renderHitungHarga()"></div>
+            <div><label class="hh-lbl">Kategori <span style="font-weight:400;text-transform:none;color:var(--txt-3)">(menentukan fee TikTok: Garden Tools vs lainnya)</span></label><select class="sel" style="max-width:none;width:100%;padding:8px 10px;font-size:12px" id="hhKat" onchange="renderHitungHarga()"><option value="">— pilih kategori —</option></select></div>
             <div id="hhBeratWrap"><label class="hh-lbl">Berat (g)</label><input class="inp editable" style="width:100%;text-align:left" id="hhBerat" type="number" value="0" oninput="renderHitungHarga()"></div>
             <div id="hhZonaWrap"><label class="hh-lbl">Zona</label><select class="sel" id="hhZona" style="width:100%" onchange="renderHitungHarga()"></select></div>
             <div id="hhHargaWrap"><label class="hh-lbl">Harga Jual</label><input class="inp editable" style="width:100%;text-align:left" id="hhHarga" type="number" value="25000" oninput="renderHitungHarga()"></div>
@@ -1452,8 +1452,8 @@ const PLATFORMS = {
     admin:()=>0.10, komisi:()=>0.055, gxp:()=>0.045, mall:0,
     desc:'Admin 10% · Komisi 5,5% · XBP 4,5% · Rp1.250 (tanpa Mall fee)' },
   tiktok_mall: { name:'TikTok Mall', color:'#69C9D0', logistic:true,
-    admin:k=>k==='GARDEN TOOLS'?0.0786:0.0766, komisi:k=>k==='GARDEN TOOLS'?0.07:0.075, gxp:k=>k==='GARDEN TOOLS'?0.035:0.03, mall:0.018,
-    desc:'Admin 7,66% (GT 7,86%) · Komisi 7,5% (GT 7%) · GXP 3% (GT 3,5%) · Mall 1,8% · Rp1.250 · Logistik' },
+    admin:k=>k==='GARDEN TOOLS'?0.0766:0.0786, komisi:k=>k==='GARDEN TOOLS'?0.07:0.075, gxp:k=>k==='GARDEN TOOLS'?0.035:0.03, mall:0.018,
+    desc:'Admin 7,86% (GT 7,66%) · Komisi 7,5% (GT 7%) · GXP 3% (GT 3,5%) · Mall 1,8% · Rp1.250 · Logistik' },
   tiktok_powershop: { name:'TikTok Powershop', color:'#A78BFA', logistic:true,
     admin:k=>k==='GARDEN TOOLS'?0.0546:0.0566, komisi:k=>k==='GARDEN TOOLS'?0.07:0.075, gxp:k=>k==='GARDEN TOOLS'?0.035:0.03, mall:0,
     desc:'Admin 5,66% (GT 5,46%) · Komisi 7,5% (GT 7%) · GXP 3,5% (GT 3,5%) · Rp1.250 · Logistik (tanpa Mall)' }
@@ -5128,6 +5128,12 @@ function toggleHitungHargaFields(){
   document.getElementById('hhMarginWrap').style.display=mode==='margin'?'':'none';
 }
 function initHitungHarga(){
+  const kSel=document.getElementById('hhKat');
+  if(kSel&&kSel.options.length<=1){
+    const kats=[...new Set(SKUS.map(x=>(x.kat||'').trim().toUpperCase()).filter(k=>k&&!k.startsWith('(')))].sort();
+    if(!kats.includes('GARDEN TOOLS'))kats.push('GARDEN TOOLS');
+    kSel.innerHTML='<option value="">— pilih kategori —</option>'+kats.map(k=>`<option value="${k}">${k}${k==='GARDEN TOOLS'?' (fee GT)':''}</option>`).join('');
+  }
   const zSel=document.getElementById('hhZona');
   if(zSel&&!zSel.options.length)zSel.innerHTML=ZONES.map(z=>`<option value="${escAttr(z)}">${z}</option>`).join('');
   toggleHitungHargaFields();
